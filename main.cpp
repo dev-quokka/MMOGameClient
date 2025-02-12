@@ -3,6 +3,7 @@
 
 #define SERVER_IP "127.0.0.1"
 #define SERVER_TCP_PORT 8080
+#define SERVER_UDP_PORT 50000
 #define PACKET_SIZE 1024
 
 #include "Packet.h"
@@ -21,9 +22,6 @@ int main() {
     User user;
     user.init();
 
-
-
-
     bool outCheck = false;
     outCheck = true;
 
@@ -32,17 +30,21 @@ int main() {
         uint8_t select;
 
         std::cout << "========================" << std::endl;
-        std::cout << "===    1. 내 정보    ===" << std::endl;
-        std::cout << "===    2. 인벤토리   ===" << std::endl;
+        std::cout << "===   1. 내 정보     ===" << std::endl;
+        std::cout << "===   2. 인벤토리    ===" << std::endl;
         std::cout << "===   3. 레이드 매칭 ===" << std::endl;
-        std::cout << "===    4. 로그아웃   ===" << std::endl;
+        std::cout << "===   4. 레이드 랭킹 ===" << std::endl;
+        std::cout << "===   5. 로그아웃    ===" << std::endl;
         std::cout << "========================" << std::endl;
 
         std::cin >> select;
 
         switch (select) {
-
         case 1: {
+
+            break;
+        }
+        case 2: {
             int checknum;
             std::cout << "원하는 인벤토리 번호 누르고 엔터를 눌러주세요." << std::endl;
             std::cout << "1. 장비 " << "2. 소비 " << "3. 재료 " << "4. 뒤로가기" << std::endl;
@@ -61,56 +63,20 @@ int main() {
             else break;
         }
 
-        case 2:
+        case 3:
         {
-            char recvBuffer[PACKET_SIZE];
-            memset(recvBuffer, 0, PACKET_SIZE);
-
-            RAID_MATCHING_REQUEST rmReq;
-            rmReq.PacketId = (UINT16)PACKET_ID::RAID_MATCHING_REQUEST;
-            rmReq.PacketLength = sizeof(RAID_MATCHING_REQUEST);
-            rmReq.uuId = uuId;
-
-            send(userSkt, (char*)&rmReq, sizeof(rmReq), 0);
-            recv(userSkt, recvBuffer, PACKET_SIZE, 0);
-
-            auto rmReqPacket = reinterpret_cast<RAID_MATCHING_RESPONSE*>(recvBuffer);
-
-            if (rmReqPacket->insertSuccess) { // Mathing Success
-                recv(userSkt, recvBuffer, PACKET_SIZE, 0);
-                auto rrReqPacket = reinterpret_cast<RAID_READY_REQUEST*>(recvBuffer);
-
-                uint8_t timer = rrReqPacket->timer; // Minutes
-                uint8_t roomNum = rrReqPacket->roomNum; // If Max RoomNum Up to Short Range, Back to Number One
-                uint8_t yourNum = rrReqPacket->yourNum;
-                UINT16 udpPort = rrReqPacket->udpPort;   // Server UDP Port Num
-                unsigned int mobHp = rrReqPacket->mobHp;
-                char serverIP[16]; // Server IP Address
-                CopyMemory(serverIP, rrReqPacket->serverIP, sizeof(rrReqPacket->serverIP));
-
-                SOCKET udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
-                HANDLE iocp = CreateIoCompletionPort((HANDLE)udpSocket, NULL, (ULONG_PTR)userSkt, 0);
-
-                sockaddr_in serverAddr;
-                serverAddr.sin_family = AF_INET;
-                serverAddr.sin_port = htons(udpPort);
-                inet_pton(AF_INET, serverIP, &serverAddr.sin_addr);
-
-                std::cout << "Matching Waitting Start" << std::endl;
-            }
-            else { // Server Matching Full
-                std::cout << "Server Matching Full. Matching Fail" << std::endl;
-            }
-
-            std::cout << "메인으로 가려면 아무키나 누르고 엔터를 눌러주세요" << std::endl;
-            std::string amukey = "";
-            std::cin >> amukey;
+            user.RaidStart();
             break;
         }
-        case 3: {
+        case 4: {
+            user.GetRaidScore();
+            break;
+        }
+        case 5: {
             outCheck = false;
             break;
         }
+
         }
     }
 

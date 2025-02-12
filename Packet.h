@@ -188,8 +188,6 @@ struct RAID_MATCHING_RESPONSE : PACKET_HEADER {
 	bool insertSuccess; // Insert Into Matching Queue Check
 };
 
-
-
 struct RAID_READY_REQUEST : PACKET_HEADER {
 	uint8_t timer; // Minutes
 	uint8_t roomNum; // If Max RoomNum Up to Short Range, Back to Number One
@@ -224,6 +222,10 @@ struct RAID_HIT_REQUEST : PACKET_HEADER {
 struct RAID_HIT_RESPONSE : PACKET_HEADER {
 	unsigned int yourScore;
 	unsigned int currentMobHp;
+};
+
+struct RAID_END_REQUEST_TO_SERVER : PACKET_HEADER { // Server to USER
+	uint8_t roomNum;
 };
 
 struct RAID_END_REQUEST : PACKET_HEADER { // Server to USER
@@ -290,6 +292,7 @@ enum class PACKET_ID : UINT16 {
 	RAID_HEAT_RESPONSE = 52,
 	RAID_END_REQUEST = 53,
 	RAID_END_RESPONSE = 54,
-	RAID_RANKING_REQUEST = 55,
-	RAID_RANKING_RESPONSE = 56,
+	RAID_END_REQUEST_TO_SERVER = 55,
+	RAID_RANKING_REQUEST = 56,
+	RAID_RANKING_RESPONSE = 57,
 };
