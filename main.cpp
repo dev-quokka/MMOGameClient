@@ -1,7 +1,7 @@
 #pragma once
-#pragma comment(lib, "ws2_32.lib") // 비주얼에서 소켓프로그래밍 하기 위한 것
 
 #define SERVER_IP "127.0.0.1"
+#define WEB_SERVER_PORT 9000
 #define SERVER_TCP_PORT 8080
 #define SERVER_UDP_PORT 50000
 #define PACKET_SIZE 1024
@@ -20,7 +20,11 @@
 
 int main() {
     User user;
-    user.init();
+
+    if (!user.init()) {
+        std::cout << "Connect Fail" << std::endl;
+        return 0;
+    }
 
     bool outCheck = false;
     outCheck = true;
@@ -65,31 +69,29 @@ int main() {
 
         case 3:
         {
-            user.RaidStart();
+            //user.RaidStart();
             break;
         }
         case 4: {
-            user.GetRaidScore();
+            //user.GetRaidScore();
             break;
         }
         case 5: {
             outCheck = false;
+            user.End();
             break;
         }
 
         }
     }
-
-    user.End();
+    return 0;
 }
-
-
 
 // ========================== USER STRUCT ==========================
 
 // 1. 웹에서 로그인 하면, 웹 서버는 로그인 체크후에 ui에 보여야할 정보를 전송해준다.
 // 2. 게임시작 버튼을 누르면 웹서버에서 mysql로 해당 유저 정보 가져와서 레디스 클러스터에 올려주기 (해당 레디스 정보들은 짧은 ttl 설정하기) 
-// 레디스에 해당 유저 UUID로 pk등록해두고 나머지 값들은 userinfo:pk, invenory:pk 등으로 저장. 
+// 레디스에 해당 유저 UUID로 pk등록해두고 나머지 값들은 userinfo:{pk}, invenory:{pk} 등으로 저장. 
 
 // 위에 까지는 웹에서 처리 됬다고 가정. 게임시작을 누르면 웹서버에서 uuid를 생성해서 레디스 클러스터에 UUID:"userId", "만든uuid", pk값으로 저장해두고
 // 서버에서 해당 데이터를 저장후에 바로 삭제 처리. 이제 해당 uuid로 유저와 통신.
