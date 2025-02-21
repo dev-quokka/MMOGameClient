@@ -1,13 +1,17 @@
 #pragma once
+
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <mswsock.h>
+#include <thread>
 #include <vector>
 #include <atomic>
-#include <mysql.h>
+#include <iostream>
 
 #include "Packet.h"
 #include "Define.h"
 
 #pragma comment(lib, "ws2_32.lib") // 비주얼에서 소켓프로그래밍 하기 위한 것
-#pragma comment (lib, "libmysql.lib") // mysql 연동
 
 class User {
 public:
@@ -25,11 +29,15 @@ public:
         WSAStartup(MAKEWORD(2, 2), &wsaData);
 
         webSkt = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (webSkt == INVALID_SOCKET) {
+            std::cout << "Server Socket Make Fail" << std::endl;
+            return false;
+        }
 
         SOCKADDR_IN addr;
         ZeroMemory(&addr, sizeof(addr));
         addr.sin_family = AF_INET;
-        addr.sin_port = htons(SERVER_TCP_PORT);
+        addr.sin_port = htons(WEB_SERVER_PORT);
         inet_pton(AF_INET, SERVER_IP, &addr.sin_addr.s_addr);
 
         std::cout << "Web Server Connecting..." << std::endl;
@@ -38,6 +46,7 @@ public:
             std::cout << "WebServer Connect Fail" << std::endl;
             return false;
         }
+            std::cout << "Web Server Connect Success" << std::endl;
 
             char recvBuffer[PACKET_SIZE];
             memset(recvBuffer, 0, PACKET_SIZE);
@@ -47,8 +56,10 @@ public:
 			ugReq.PacketLength = sizeof(USER_GAMESTART_REQUEST);
 			strncpy_s(ugReq.userId, userId.c_str(), MAX_USER_ID_LEN);
 
+            std::cout << "GameStart Req to Web Server" << std::endl;
             send(webSkt, (char*)&ugReq, sizeof(ugReq), 0);
             recv(webSkt, recvBuffer, PACKET_SIZE, 0);
+            std::cout << "Get GameStart Res From Web Server" << std::endl;
 
             // GET USER UUID
             auto ucReqPacket = reinterpret_cast<USER_GAMESTART_RESPONSE*>(recvBuffer);
@@ -86,7 +97,7 @@ public:
 
         udpSocket = WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, NULL, 0, WSA_FLAG_OVERLAPPED);
         if (udpSocket == INVALID_SOCKET) {
-            std::cerr << "Udp Socket Make Fail Error : " << WSAGetLastError() << std::endl;
+            std::cout << "Udp Socket Make Fail Error : " << WSAGetLastError() << std::endl;
             return false;
         }
        
@@ -105,6 +116,7 @@ public:
 
     bool CreateUdpThread() {
         workThread = std::thread([this]() {UdpWorkThread();});
+        return true;
     }
 
     //void UDPSend() {

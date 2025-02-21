@@ -1,8 +1,8 @@
 #pragma once
 
 #define SERVER_IP "127.0.0.1"
-#define WEB_SERVER_PORT 9000
-#define SERVER_TCP_PORT 8080
+#define SERVER_TCP_PORT 9090
+#define WEB_SERVER_PORT 9091
 #define SERVER_UDP_PORT 50000
 #define PACKET_SIZE 1024
 
