@@ -16,8 +16,18 @@
 class User {
 public:
 	~User() {
+        char recvBuffer[PACKET_SIZE];
+        memset(recvBuffer, 0, PACKET_SIZE);
+
+        USER_LOGOUT_REQUEST_PACKET ulReq;
+        ulReq.PacketId = (UINT16)PACKET_ID::USER_LOGOUT_REQUEST;
+        ulReq.PacketLength = sizeof(USER_LOGOUT_REQUEST_PACKET);
+
+        send(userSkt, (char*)&ulReq, sizeof(ulReq), 0);
+
 		WorkRun = false;
 		if (workThread.joinable()) workThread.join();
+        std::this_thread::sleep_for(std::chrono::seconds(3));
 		CloseHandle(udpHandle);
 		closesocket(userSkt);
 		closesocket(udpSocket);
@@ -57,8 +67,10 @@ public:
 			strncpy_s(ugReq.userId, userId.c_str(), MAX_USER_ID_LEN);
 
             std::cout << "GameStart Req to Web Server" << std::endl;
+
             send(webSkt, (char*)&ugReq, sizeof(ugReq), 0);
             recv(webSkt, recvBuffer, PACKET_SIZE, 0);
+
             std::cout << "Get GameStart Res From Web Server" << std::endl;
 
             // GET USER UUID
@@ -94,6 +106,23 @@ public:
             std::cout << "Quokka Server Connect Fail" << std::endl;
             return false;
         }
+
+        USER_CONNECT_REQUEST_PACKET ucReq;
+        ucReq.PacketId = (UINT16)PACKET_ID::USER_CONNECT_REQUEST;
+        ucReq.PacketLength = sizeof(USER_CONNECT_REQUEST_PACKET);
+        strncpy_s(ucReq.userId, userId.c_str(), MAX_USER_ID_LEN);
+        strncpy_s(ucReq.userToken, webToken.c_str(), MAX_JWT_TOKEN_LEN);
+
+        std::cout << "Connect Requset To Game Server.." << std::endl;
+
+        send(userSkt, (char*)&ucReq, sizeof(ucReq), 0);
+        recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+
+        auto ucResPacket = reinterpret_cast<USER_CONNECT_RESPONSE_PACKET*>(recvBuffer);
+
+        if (ucResPacket->isSuccess == false) return false;
+
+        std::cout << "Connect Success In Game Server" << std::endl;
 
         udpSocket = WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, NULL, 0, WSA_FLAG_OVERLAPPED);
         if (udpSocket == INVALID_SOCKET) {

@@ -31,7 +31,7 @@ int main() {
 
     while (outCheck) {
         std::cout << std::endl;
-        uint8_t select;
+        uint16_t select;
 
         std::cout << "========================" << std::endl;
         std::cout << "===   1. ³» Á¤º¸     ===" << std::endl;
@@ -79,11 +79,12 @@ int main() {
         case 5: {
             outCheck = false;
             user.End();
-            break;
+            return 0;
         }
 
         }
     }
+
     return 0;
 }
 

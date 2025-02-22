@@ -17,8 +17,8 @@ struct PACKET_HEADER
 
 //  ---------------------------- SYSTEM  ----------------------------
 
-const int MAX_JWT_TOKEN_LEN = 256;
 const int MAX_USER_ID_LEN = 32;
+const int MAX_JWT_TOKEN_LEN = 256;
 
 struct USER_GAMESTART_REQUEST : PACKET_HEADER {
 	char userId[MAX_USER_ID_LEN + 1];
@@ -26,6 +26,15 @@ struct USER_GAMESTART_REQUEST : PACKET_HEADER {
 
 struct USER_GAMESTART_RESPONSE : PACKET_HEADER {
 	char webToken[MAX_JWT_TOKEN_LEN + 1];
+};
+
+struct USER_CONNECT_REQUEST_PACKET : PACKET_HEADER {
+	char userId[MAX_USER_ID_LEN + 1];
+	char userToken[MAX_JWT_TOKEN_LEN + 1]; // userToken For User Check
+};
+
+struct USER_CONNECT_RESPONSE_PACKET : PACKET_HEADER {
+	bool isSuccess;
 };
 
 struct USER_LOGOUT_REQUEST_PACKET : PACKET_HEADER {
