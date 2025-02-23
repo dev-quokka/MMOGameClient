@@ -58,19 +58,31 @@ public:
         }
             std::cout << "Web Server Connect Success" << std::endl;
 
-            char recvBuffer[PACKET_SIZE];
             memset(recvBuffer, 0, PACKET_SIZE);
 
-			USER_GAMESTART_REQUEST ugReq;
-			ugReq.PacketId = (UINT16)WEBPACKET_ID::USER_GAMESTART_REQUEST;
-			ugReq.PacketLength = sizeof(USER_GAMESTART_REQUEST);
-			strncpy_s(ugReq.userId, userId.c_str(), MAX_USER_ID_LEN);
+            USER_GAMESTART_REQUEST ugReq;
+            ugReq.PacketId = (UINT16)WEBPACKET_ID::USER_GAMESTART_REQUEST;
+            ugReq.PacketLength = sizeof(USER_GAMESTART_REQUEST);
+            strncpy_s(ugReq.userId, userId.c_str(), MAX_USER_ID_LEN);
 
             std::cout << "GameStart Req to Web Server" << std::endl;
 
-            send(webSkt, (char*)&ugReq, sizeof(ugReq), 0);
-            recv(webSkt, recvBuffer, PACKET_SIZE, 0);
+            send(webSkt, (char*)&ugReq, sizeof(ugReq), 0); // 게임 시작 준비 요청
 
+            recv(webSkt, recvBuffer, PACKET_SIZE, 0); // 유저 정보
+            auto uiPacket = reinterpret_cast<USERINFO_SEND*>(recvBuffer);
+            std::cout << "Get GameStart Res From Web Server" << std::endl;
+
+            recv(webSkt, recvBuffer, PACKET_SIZE, 0); // 장비 정보
+            auto eqPacket = reinterpret_cast<EQUIPMENT_SEND*>(recvBuffer);
+            std::cout << "Get GameStart Res From Web Server" << std::endl;
+
+            recv(webSkt, recvBuffer, PACKET_SIZE, 0); // 소비 정보
+            auto csPacket = reinterpret_cast<CONSUMABLES_SEND*>(recvBuffer);
+            std::cout << "Get GameStart Res From Web Server" << std::endl;
+
+            recv(webSkt, recvBuffer, PACKET_SIZE, 0); // 재료 정보
+            auto mtPacket = reinterpret_cast<MATERIALS_SEND*>(recvBuffer);
             std::cout << "Get GameStart Res From Web Server" << std::endl;
 
             // GET USER UUID
@@ -79,6 +91,7 @@ public:
 			std::string webToken = ucReqPacket->webToken;
 
             if (webToken=="") { // 웹서버에서 토큰 생성 실패
+                std::cout << "Get WebToken Fail" << std::endl;
                 return false;
             }
 
@@ -148,8 +161,37 @@ public:
         return true;
     }
 
-    void MonsterNum(uint16_t) {
+    void MonsterNum(uint16_t mobNum_) {
+        EXP_UP_REQUEST euReq;
+        euReq.PacketId = (UINT16)PACKET_ID::EXP_UP_REQUEST;
+        euReq.PacketLength = sizeof(EXP_UP_REQUEST);
+        euReq.mobNum = mobNum_;
 
+        send(userSkt, (char*)&euReq, sizeof(euReq), 0);
+        recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+
+        auto ucResPacket = reinterpret_cast<EXP_UP_RESPONSE*>(recvBuffer);
+
+        if (ucResPacket->increaseLevel == 0) { // Only Exp Up
+            exp = ucResPacket->currentExp;
+            std::cout << mobNum_ << " 몬스터를 잡았습니다 !" << std::endl;
+            std::cout << "현재 레벨 : " << level.load() << std::endl;
+            std::cout << "현재 경험치 : " << exp << std::endl;
+        }
+        else { // Level up
+            level.fetch_add(ucResPacket->increaseLevel);
+            exp = ucResPacket->currentExp;
+            std::cout << mobNum_ << " 몬스터를 잡았습니다 !" << std::endl;
+            std::cout << "레벨업 했습니다 !" << std::endl;
+            std::cout << "현재 레벨 : " << level.load() << std::endl;
+            std::cout << "현재 경험치 : " << exp << std::endl;
+        }
+    }
+
+    std::pair<uint16_t, unsigned int> GetUserLevelExp() {
+        std::cout << "현재 레벨 : " << level.load() << std::endl;
+        std::cout << "현재 경험치 : " << exp.load() << std::endl;
+        return {level, exp};
     }
 
     //void UDPSend() {
@@ -348,9 +390,11 @@ private:
 
     std::string userId = "quokka";
 
-    std::atomic<uint8_t> level;
+    std::atomic<uint16_t> level;
     std::atomic<unsigned int> exp;
     std::atomic<unsigned int> mobHp;
 
     std::thread workThread;
+
+    char recvBuffer[PACKET_SIZE];
 };

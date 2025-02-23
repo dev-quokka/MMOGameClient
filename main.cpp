@@ -45,16 +45,17 @@ int main() {
 
         switch (select) {
         case 1: {
-            std::cout << "나가려면 1번 몹을 잡으려면 2번" << std::endl;
+            user.GetUserLevelExp();
             uint16_t k = 0;
             uint16_t mob = 0;
             while (1) {
+                std::cout << "나가려면 1번 몹을 잡으려면 2번" << std::endl;
                 std::cin >> k;
                 if (k == 2) {
                     std::cout << "경험치 1~5의 몬스터를 잡으려면 번호 입력" << std::endl;
                     std::cin >> mob;
                     if (mob >= 1 && mob <= 5) {
-
+                        user.MonsterNum(mob);
                     }
                     else {
                         std::cout << "잘못된 몬스터 번호 ! 다시입력" << std::endl;
@@ -64,8 +65,6 @@ int main() {
                     break;
                 }
             }
-
-
             break;
         }
         case 2: {

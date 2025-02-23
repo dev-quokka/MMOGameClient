@@ -15,6 +15,32 @@ struct PACKET_HEADER
 	uint16_t PacketId;
 };
 
+struct USERINFO {
+	uint16_t level;
+	unsigned int exp;
+	USERINFO() : level(0), exp(0) {}
+};
+
+struct EQUIPMENT {
+	uint16_t itemCode;
+	uint16_t position;
+	uint16_t enhance;
+	EQUIPMENT() : itemCode(0), position(0), enhance(0) {}
+};
+
+struct CONSUMABLES {
+	uint16_t itemCode;
+	uint16_t position;
+	uint16_t count;
+	CONSUMABLES() : itemCode(0), position(0), count(0) {}
+};
+
+struct MATERIALS {
+	uint16_t itemCode;
+	uint16_t position;
+	uint16_t count;
+	MATERIALS() : itemCode(0), position(0), count(0) {}
+};
 //  ---------------------------- SYSTEM  ----------------------------
 
 const int MAX_USER_ID_LEN = 32;
@@ -41,6 +67,34 @@ struct USER_LOGOUT_REQUEST_PACKET : PACKET_HEADER {
 
 };
 
+//  ---------------------------- WEB  ----------------------------
+
+const int MAX_USER_ID_LEN = 32;
+
+struct USER_GAMESTART_REQUEST : PACKET_HEADER {
+	char userId[MAX_USER_ID_LEN + 1];
+};
+
+struct USER_GAMESTART_RESPONSE : PACKET_HEADER {
+	char webToken[MAX_JWT_TOKEN_LEN + 1];
+};
+
+struct USERINFO_SEND : PACKET_HEADER {
+	std::vector<USERINFO> UserInfo;
+};
+
+struct EQUIPMENT_SEND : PACKET_HEADER {
+	std::vector<EQUIPMENT> Equipment;
+};
+
+struct CONSUMABLES_SEND : PACKET_HEADER {
+	std::vector<CONSUMABLES> Consumables;
+};
+
+struct MATERIALS_SEND : PACKET_HEADER {
+	std::vector<MATERIALS> Materials;
+};
+
 //  ---------------------------- USER STATUS  ----------------------------
 
 struct EXP_UP_REQUEST : PACKET_HEADER {
@@ -48,7 +102,8 @@ struct EXP_UP_REQUEST : PACKET_HEADER {
 };
 
 struct EXP_UP_RESPONSE : PACKET_HEADER {
-	unsigned int expUp;
+	uint16_t increaseLevel;
+	unsigned int currentExp;
 };
 
 struct LEVEL_UP_RESPONSE : PACKET_HEADER {
@@ -207,8 +262,11 @@ enum class WEBPACKET_ID : uint16_t {
 	USER_LOGIN_REQUEST = 1,
 	USER_LOGIN_RESPONSE = 2,
 	USER_GAMESTART_REQUEST = 3,
-	USER_GAMESTART_RESPONSE = 4
-
+	USER_GAMESTART_RESPONSE = 4,
+	USERINFO_SEND = 5,
+	EQUIPMENT_SEND = 6,
+	CONSUMABLES_SEND = 7,
+	MATERIALS_SEND = 8,
 };
 
 enum class PACKET_ID : uint16_t {
