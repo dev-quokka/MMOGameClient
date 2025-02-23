@@ -148,6 +148,10 @@ public:
         return true;
     }
 
+    void MonsterNum(uint16_t) {
+
+    }
+
     //void UDPSend() {
 
     //}
