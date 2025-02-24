@@ -46,14 +46,6 @@ struct MATERIALS {
 const int MAX_USER_ID_LEN = 32;
 const int MAX_JWT_TOKEN_LEN = 256;
 
-struct USER_GAMESTART_REQUEST : PACKET_HEADER {
-	char userId[MAX_USER_ID_LEN + 1];
-};
-
-struct USER_GAMESTART_RESPONSE : PACKET_HEADER {
-	char webToken[MAX_JWT_TOKEN_LEN + 1];
-};
-
 struct USER_CONNECT_REQUEST_PACKET : PACKET_HEADER {
 	char userId[MAX_USER_ID_LEN + 1];
 	char userToken[MAX_JWT_TOKEN_LEN + 1]; // userToken For User Check
@@ -69,7 +61,40 @@ struct USER_LOGOUT_REQUEST_PACKET : PACKET_HEADER {
 
 //  ---------------------------- WEB  ----------------------------
 
-const int MAX_USER_ID_LEN = 32;
+struct USERINFO_REQUEST : PACKET_HEADER {
+	char userId[MAX_USER_ID_LEN + 1];
+};
+
+struct USERINFO_RESPONSE : PACKET_HEADER {
+	USERINFO UserInfo;
+};
+
+struct EQUIPMENT_REQUEST : PACKET_HEADER {
+
+};
+
+struct EQUIPMENT_RESPONSE : PACKET_HEADER {
+	uint16_t eqCount;
+	std::vector<EQUIPMENT> Equipments;
+};
+
+struct CONSUMABLES_REQUEST : PACKET_HEADER {
+
+};
+
+struct CONSUMABLES_RESPONSE : PACKET_HEADER {
+	uint16_t csCount;
+	std::vector<CONSUMABLES> Consumables;
+};
+
+struct MATERIALS_REQUEST : PACKET_HEADER {
+
+};
+
+struct MATERIALS_RESPONSE : PACKET_HEADER {
+	uint16_t mtCount;
+	std::vector<MATERIALS> Materials;
+};
 
 struct USER_GAMESTART_REQUEST : PACKET_HEADER {
 	char userId[MAX_USER_ID_LEN + 1];
@@ -77,22 +102,6 @@ struct USER_GAMESTART_REQUEST : PACKET_HEADER {
 
 struct USER_GAMESTART_RESPONSE : PACKET_HEADER {
 	char webToken[MAX_JWT_TOKEN_LEN + 1];
-};
-
-struct USERINFO_SEND : PACKET_HEADER {
-	std::vector<USERINFO> UserInfo;
-};
-
-struct EQUIPMENT_SEND : PACKET_HEADER {
-	std::vector<EQUIPMENT> Equipment;
-};
-
-struct CONSUMABLES_SEND : PACKET_HEADER {
-	std::vector<CONSUMABLES> Consumables;
-};
-
-struct MATERIALS_SEND : PACKET_HEADER {
-	std::vector<MATERIALS> Materials;
 };
 
 //  ---------------------------- USER STATUS  ----------------------------
@@ -263,10 +272,14 @@ enum class WEBPACKET_ID : uint16_t {
 	USER_LOGIN_RESPONSE = 2,
 	USER_GAMESTART_REQUEST = 3,
 	USER_GAMESTART_RESPONSE = 4,
-	USERINFO_SEND = 5,
-	EQUIPMENT_SEND = 6,
-	CONSUMABLES_SEND = 7,
-	MATERIALS_SEND = 8,
+	USERINFO_REQUEST = 5,
+	USERINFO_RESPONSE = 6,
+	EQUIPMENT_REQUEST = 7,
+	EQUIPMENT_RESPONSE = 8,
+	CONSUMABLES_REQUEST = 9,
+	CONSUMABLES_RESPONSE = 10,
+	MATERIALS_REQUEST = 11,
+	MATERIALS_RESPONSE = 12,
 };
 
 enum class PACKET_ID : uint16_t {

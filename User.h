@@ -60,30 +60,89 @@ public:
 
             memset(recvBuffer, 0, PACKET_SIZE);
 
+            USERINFO_REQUEST uiReq;
+            uiReq.PacketId = (UINT16)WEBPACKET_ID::USERINFO_REQUEST;
+            uiReq.PacketLength = sizeof(USERINFO_REQUEST);
+            strncpy_s(uiReq.userId, userId.c_str(), MAX_USER_ID_LEN);
+
+            send(webSkt, (char*)&uiReq, sizeof(uiReq), 0); // 유저 정보 요청
+            recv(webSkt, recvBuffer, PACKET_SIZE, 0); // 유저 정보
+            auto uiPacket = reinterpret_cast<USERINFO_RESPONSE*>(recvBuffer);
+            USERINFO tempU = uiPacket->UserInfo;
+            exp = tempU.exp;
+            level = tempU.level;
+
+            if (tempU.level == 0) {
+                std::cout << "Get Userinfo Fail" << std::endl;
+                return false;
+            }
+            std::cout << "Get Userinfo Success" << std::endl;
+
+            EQUIPMENT_REQUEST eqReq;
+            eqReq.PacketId = (UINT16)WEBPACKET_ID::EQUIPMENT_REQUEST;
+            eqReq.PacketLength = sizeof(EQUIPMENT_REQUEST);
+
+            send(webSkt, (char*)&eqReq, sizeof(eqReq), 0); // 장비 정보 요청
+            recv(webSkt, recvBuffer, PACKET_SIZE, 0); // 장비 정보
+
+            auto eqPacket = reinterpret_cast<EQUIPMENT_RESPONSE*>(recvBuffer);
+            std::cout << eqPacket->eqCount << std::endl;
+            std::vector<EQUIPMENT> tempEq(eqPacket->eqCount);
+            char* ptr = recvBuffer + sizeof(PACKET_HEADER) + sizeof(uint16_t);
+            return false;
+            tempEq = eqPacket->Equipments;
+            eq = tempEq;
+
+            if (eq.empty()) {
+                std::cout << "Get EQUIPMENT Fail" << std::endl;
+                return false;
+            }
+
+            std::cout << "Get EQUIPMENT Success" << std::endl;
+
+            CONSUMABLES_REQUEST csReq;
+            uiReq.PacketId = (UINT16)WEBPACKET_ID::CONSUMABLES_REQUEST;
+            uiReq.PacketLength = sizeof(CONSUMABLES_REQUEST);
+
+            send(webSkt, (char*)&uiReq, sizeof(uiReq), 0); // 게임 시작 준비 요청
+            recv(webSkt, recvBuffer, PACKET_SIZE, 0); // 소비 정보
+            auto csPacket = reinterpret_cast<CONSUMABLES_RESPONSE*>(recvBuffer);
+            std::vector<CONSUMABLES> tempCs(csPacket->csCount);
+            tempCs = csPacket->Consumables;
+            tempCs = cs;
+
+            if (cs.empty()) {
+                std::cout << "Get CONSUMABLES Fail" << std::endl;
+                return false;
+            }
+
+            std::cout << "Get CONSUMABLES Success" << std::endl;
+
+            MATERIALS_REQUEST mtReq;
+            mtReq.PacketId = (UINT16)WEBPACKET_ID::MATERIALS_REQUEST;
+            mtReq.PacketLength = sizeof(MATERIALS_REQUEST);
+
+            send(webSkt, (char*)&mtReq, sizeof(mtReq), 0); // 게임 시작 준비 요청
+            recv(webSkt, recvBuffer, PACKET_SIZE, 0); // 재료 정보
+            auto mtPacket = reinterpret_cast<MATERIALS_RESPONSE*>(recvBuffer);
+            std::vector<MATERIALS> tempMt(mtPacket->mtCount);
+            tempMt = mtPacket->Materials;
+            tempMt = mt;
+
+            if (mt.empty()) {
+                std::cout << "Get MATERIALS Fail" << std::endl;
+                return false;
+            }
+
+            std::cout << "Get MATERIALS Success" << std::endl;
+
             USER_GAMESTART_REQUEST ugReq;
             ugReq.PacketId = (UINT16)WEBPACKET_ID::USER_GAMESTART_REQUEST;
             ugReq.PacketLength = sizeof(USER_GAMESTART_REQUEST);
             strncpy_s(ugReq.userId, userId.c_str(), MAX_USER_ID_LEN);
 
-            std::cout << "GameStart Req to Web Server" << std::endl;
-
             send(webSkt, (char*)&ugReq, sizeof(ugReq), 0); // 게임 시작 준비 요청
-
-            recv(webSkt, recvBuffer, PACKET_SIZE, 0); // 유저 정보
-            auto uiPacket = reinterpret_cast<USERINFO_SEND*>(recvBuffer);
-            std::cout << "Get GameStart Res From Web Server" << std::endl;
-
-            recv(webSkt, recvBuffer, PACKET_SIZE, 0); // 장비 정보
-            auto eqPacket = reinterpret_cast<EQUIPMENT_SEND*>(recvBuffer);
-            std::cout << "Get GameStart Res From Web Server" << std::endl;
-
-            recv(webSkt, recvBuffer, PACKET_SIZE, 0); // 소비 정보
-            auto csPacket = reinterpret_cast<CONSUMABLES_SEND*>(recvBuffer);
-            std::cout << "Get GameStart Res From Web Server" << std::endl;
-
-            recv(webSkt, recvBuffer, PACKET_SIZE, 0); // 재료 정보
-            auto mtPacket = reinterpret_cast<MATERIALS_SEND*>(recvBuffer);
-            std::cout << "Get GameStart Res From Web Server" << std::endl;
+            recv(webSkt, recvBuffer, PACKET_SIZE, 0); // 게임 시작을 위한 웹 토큰
 
             // GET USER UUID
             auto ucReqPacket = reinterpret_cast<USER_GAMESTART_RESPONSE*>(recvBuffer);
@@ -395,6 +454,10 @@ private:
     std::atomic<unsigned int> mobHp;
 
     std::thread workThread;
+
+    std::vector<EQUIPMENT> eq;
+    std::vector<CONSUMABLES> cs;
+    std::vector<MATERIALS> mt;
 
     char recvBuffer[PACKET_SIZE];
 };
