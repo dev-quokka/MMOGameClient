@@ -67,6 +67,7 @@ public:
 
             send(webSkt, (char*)&uiReq, sizeof(uiReq), 0); // 유저 정보 요청
             recv(webSkt, recvBuffer, PACKET_SIZE, 0); // 유저 정보
+
             auto uiPacket = reinterpret_cast<USERINFO_RESPONSE*>(recvBuffer);
             USERINFO tempU = uiPacket->UserInfo;
             exp = tempU.exp;
@@ -86,35 +87,44 @@ public:
             recv(webSkt, recvBuffer, PACKET_SIZE, 0); // 장비 정보
 
             auto eqPacket = reinterpret_cast<EQUIPMENT_RESPONSE*>(recvBuffer);
-            std::cout << eqPacket->eqCount << std::endl;
-            std::vector<EQUIPMENT> tempEq(eqPacket->eqCount);
             char* ptr = recvBuffer + sizeof(PACKET_HEADER) + sizeof(uint16_t);
-            return false;
-            tempEq = eqPacket->Equipments;
-            eq = tempEq;
 
-            if (eq.empty()) {
-                std::cout << "Get EQUIPMENT Fail" << std::endl;
-                return false;
+            eq.resize(10);
+
+            for (int i = 0; i < eqPacket->eqCount; i++) {
+                EQUIPMENT tempE;
+                memcpy((char*)&tempE, ptr, sizeof(EQUIPMENT));
+                eq[tempE.position] = tempE;
+                ptr += sizeof(EQUIPMENT);
             }
 
             std::cout << "Get EQUIPMENT Success" << std::endl;
 
             CONSUMABLES_REQUEST csReq;
-            uiReq.PacketId = (UINT16)WEBPACKET_ID::CONSUMABLES_REQUEST;
-            uiReq.PacketLength = sizeof(CONSUMABLES_REQUEST);
+            csReq.PacketId = (UINT16)WEBPACKET_ID::CONSUMABLES_REQUEST;
+            csReq.PacketLength = sizeof(CONSUMABLES_REQUEST);
 
-            send(webSkt, (char*)&uiReq, sizeof(uiReq), 0); // 게임 시작 준비 요청
+            send(webSkt, (char*)&csReq, sizeof(csReq), 0);
             recv(webSkt, recvBuffer, PACKET_SIZE, 0); // 소비 정보
-            auto csPacket = reinterpret_cast<CONSUMABLES_RESPONSE*>(recvBuffer);
-            std::vector<CONSUMABLES> tempCs(csPacket->csCount);
-            tempCs = csPacket->Consumables;
-            tempCs = cs;
 
-            if (cs.empty()) {
-                std::cout << "Get CONSUMABLES Fail" << std::endl;
-                return false;
+            auto csPacket = reinterpret_cast<CONSUMABLES_RESPONSE*>(recvBuffer);
+
+            std::vector<CONSUMABLES> tempCs(csPacket->csCount);
+            char* ptr2 = recvBuffer + sizeof(PACKET_HEADER) + sizeof(uint16_t);
+
+            cs.resize(10);
+
+            for (int i = 0; i < eqPacket->eqCount; i++) {
+                CONSUMABLES tempCon;
+                memcpy((char*)&tempCon, ptr2, sizeof(CONSUMABLES));
+                cs[tempCon.position] = tempCon;
+                ptr2 += sizeof(CONSUMABLES);
             }
+
+            //if (cs.empty()) {
+            //    std::cout << "Get CONSUMABLES Fail" << std::endl;
+            //    return false;
+            //}
 
             std::cout << "Get CONSUMABLES Success" << std::endl;
 
@@ -122,17 +132,27 @@ public:
             mtReq.PacketId = (UINT16)WEBPACKET_ID::MATERIALS_REQUEST;
             mtReq.PacketLength = sizeof(MATERIALS_REQUEST);
 
-            send(webSkt, (char*)&mtReq, sizeof(mtReq), 0); // 게임 시작 준비 요청
+            send(webSkt, (char*)&mtReq, sizeof(mtReq), 0); 
             recv(webSkt, recvBuffer, PACKET_SIZE, 0); // 재료 정보
-            auto mtPacket = reinterpret_cast<MATERIALS_RESPONSE*>(recvBuffer);
-            std::vector<MATERIALS> tempMt(mtPacket->mtCount);
-            tempMt = mtPacket->Materials;
-            tempMt = mt;
 
-            if (mt.empty()) {
-                std::cout << "Get MATERIALS Fail" << std::endl;
-                return false;
+            auto mtPacket = reinterpret_cast<MATERIALS_RESPONSE*>(recvBuffer);
+
+            std::vector<MATERIALS> tempMt(mtPacket->mtCount);
+            char* ptr3 = recvBuffer + sizeof(PACKET_HEADER) + sizeof(uint16_t);
+
+            mt.resize(10);
+
+            for (int i = 0; i < eqPacket->eqCount; i++) {
+                MATERIALS tempM;
+                memcpy((char*)&tempM, ptr3, sizeof(MATERIALS));
+                mt[tempM.position] = tempM;
+                ptr3 += sizeof(MATERIALS);
             }
+
+            //if (mt.empty()) {
+            //    std::cout << "Get MATERIALS Fail" << std::endl;
+            //    return false;
+            //}
 
             std::cout << "Get MATERIALS Success" << std::endl;
 
@@ -287,6 +307,112 @@ public:
             }
         }
     }
+
+    void GetInventory(uint16_t invenNum_) {
+        if (invenNum_ == 1) {
+            std::cout << "장비 인벤토리" << std::endl;
+            for (int i = 0; i < eq.size(); i++) {
+                if (eq[i].itemCode == 0) continue;
+                std::cout << eq[i].position << "번 위치에 +" << eq[i].enhance << "강화 되어있는 " << eq[i].itemCode << "번 아이템 존재" << std::endl;
+            }
+        }
+        else if (invenNum_ == 2) {
+            std::cout << "소비 인벤토리" << std::endl;
+            for (int i = 0; i < eq.size(); i++) {
+                if (cs[i].itemCode == 0) continue;
+                std::cout << cs[i].position << "번 위치에 " << cs[i].itemCode << "번 아이템 " << cs[i].count <<"개 존재"<< std::endl;
+            }
+        }
+        else if (invenNum_ == 3) {
+            std::cout << "재료 인벤토리" << std::endl;
+            for (int i = 0; i < eq.size(); i++) {
+                if (mt[i].itemCode == 0) continue;
+                std::cout << mt[i].position << "번 위치에 " << mt[i].itemCode << "번 아이템 " << mt[i].count << "개 존재" << std::endl;
+            }
+        }
+        return;
+    }
+
+    bool MoveItem(uint16_t invenNum_, uint16_t currentpos_, uint16_t movepos_) {
+        if (invenNum_ == 1) { // 장비
+            MOV_EQUIPMENT_REQUEST miReq;
+            miReq.PacketId = (UINT16)PACKET_ID::MOV_EQUIPMENT_REQUEST;
+            miReq.PacketLength = sizeof(MOV_EQUIPMENT_REQUEST);
+
+            EQUIPMENT currentE = eq[currentpos_];
+            EQUIPMENT moveE = eq[movepos_];
+
+            miReq.dragItemCode = moveE.itemCode;
+            miReq.dragItemEnhance = moveE.enhance;
+            miReq.dragItemSlotPos = currentE.position;
+            miReq.targetItemCode = currentE.itemCode;
+            miReq.targetItemEnhance = currentE.enhance;
+            miReq.targetItemSlotPos = moveE.position;
+
+            send(userSkt, (char*)&miReq, sizeof(miReq), 0);
+            recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+
+            auto miResPacket = reinterpret_cast<MOV_EQUIPMENT_RESPONSE*>(recvBuffer);
+
+            if (!miResPacket->isSuccess) return false;
+            return true;
+        }
+        else { // 소비 or 재료
+            MOV_ITEM_REQUEST miReq;
+            miReq.PacketId = (UINT16)PACKET_ID::MOV_ITEM_REQUEST;
+            miReq.PacketLength = sizeof(MOV_ITEM_REQUEST);
+
+            if (invenNum_ == 2) { // 소비
+                CONSUMABLES currentC = cs[currentpos_];
+                CONSUMABLES moveC = cs[movepos_];
+
+                miReq.ItemType = invenNum_ - 1;
+                miReq.dragItemCode = moveC.itemCode;
+                miReq.dragItemCount = moveC.count;
+                miReq.dragItemSlotPos = currentC.position; 
+                miReq.targetItemCode = currentC.itemCode;
+                miReq.targetItemCount = currentC.count;
+                miReq.targetItemSlotPos = moveC.position;
+
+                send(userSkt, (char*)&miReq, sizeof(miReq), 0);
+                recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+
+                auto miResPacket = reinterpret_cast<MOV_ITEM_RESPONSE*>(recvBuffer);
+
+                if (!miResPacket->isSuccess) return false;
+                return true;
+            }
+            else if (invenNum_== 3) {
+                MATERIALS currentE = mt[currentpos_];
+                MATERIALS moveE = mt[movepos_];
+
+                miReq.ItemType = invenNum_ - 1;
+                miReq.dragItemCode = moveE.itemCode;
+                miReq.dragItemCount = moveE.count;
+                miReq.dragItemSlotPos = currentE.position;
+                miReq.targetItemCode = currentE.itemCode;
+                miReq.targetItemCount = currentE.count;
+                miReq.targetItemSlotPos = moveE.position;
+
+                send(userSkt, (char*)&miReq, sizeof(miReq), 0);
+                recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+
+                auto miResPacket = reinterpret_cast<MOV_ITEM_RESPONSE*>(recvBuffer);
+
+                if (!miResPacket->isSuccess) return false;
+                return true;
+            }
+        }
+    }
+
+    bool AddItem(uint16_t invenNum_,uint16_t itemCode_, uint16_t count_) {
+
+    }
+
+    bool DeleteItem(uint16_t invenNum_,uint16_t pos_) {
+
+    }
+
 
     //void RaidStart() {
     //        char recvBuffer[PACKET_SIZE];
