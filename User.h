@@ -225,14 +225,15 @@ public:
         udpHandle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 1);
         auto bIOCPHandle = CreateIoCompletionPort((HANDLE)udpSocket, udpHandle, (ULONG_PTR)0, 0);
 
-        sockaddr_in serverAddr;
-        serverAddr.sin_family = AF_INET;
-        serverAddr.sin_port = htons(SERVER_UDP_PORT);
-        inet_pton(AF_INET, SERVER_IP, &serverAddr.sin_addr);
+        udpAddr.sin_family = AF_INET;
+        udpAddr.sin_port = htons(SERVER_UDP_PORT);
+        inet_pton(AF_INET, SERVER_IP, &udpAddr.sin_addr);
 
         std::cout << "Udp Socket Make Success" << std::endl;
 
         CreateUdpThread();
+
+        std::cout << userId << " 게임 접속 성공 !" << std::endl;
     }
 
     bool CreateUdpThread() {
@@ -273,10 +274,6 @@ public:
         return {level, exp};
     }
 
-    //void UDPSend() {
-
-    //}
-
     //void UDPRecv() {
 
     //}
@@ -297,7 +294,7 @@ public:
             );
 
             auto overlapped = (OverlappedUDP*)lpOverlapped;
-
+            std::cout << "들어옴?" << std::endl;
             if (overlapped->taskType == TaskType::UDP_RECV) { // 레이드 몹 hp 동기화 요청
                 auto hp = reinterpret_cast<unsigned int*>(overlapped->wsaBuf.buf);
                 std::cout <<"Current Mob Hp : " << mobHp << std::endl;
@@ -341,7 +338,7 @@ public:
 
             EQUIPMENT currentE = eq[currentpos_];
             EQUIPMENT moveE = eq[movepos_];
-
+            
             miReq.dragItemCode = moveE.itemCode;
             miReq.dragItemEnhance = moveE.enhance;
             miReq.dragItemSlotPos = currentE.position;
@@ -413,104 +410,108 @@ public:
 
     }
 
+    void RaidStart() {
+        RAID_MATCHING_REQUEST rmReq;
+        rmReq.PacketId = (UINT16)PACKET_ID::RAID_MATCHING_REQUEST;
+        rmReq.PacketLength = sizeof(RAID_MATCHING_REQUEST);
 
-    //void RaidStart() {
-    //        char recvBuffer[PACKET_SIZE];
-    //        memset(recvBuffer, 0, PACKET_SIZE);
+        send(userSkt, (char*)&rmReq, sizeof(rmReq), 0);
+        std::cout << "Match Insert Waitting " << std::endl;
+        recv(userSkt, recvBuffer, PACKET_SIZE, 0);
 
-    //        RAID_MATCHING_REQUEST rmReq;
-    //        rmReq.PacketId = (UINT16)PACKET_ID::RAID_MATCHING_REQUEST;
-    //        rmReq.PacketLength = sizeof(RAID_MATCHING_REQUEST);
-    //        rmReq.uuId = uuId;
+            auto rmReqPacket = reinterpret_cast<RAID_MATCHING_RESPONSE*>(recvBuffer);
 
-    //        send(userSkt, (char*)&rmReq, sizeof(rmReq), 0);
-    //        std::cout << "Match Insert Waitting " << std::endl;
-    //        recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+            if (!rmReqPacket->insertSuccess) { // Mathing Success
+                std::cout << "Server Matching Full. Matching Fail" << std::endl;
+                return;
+            }
 
-    //        auto rmReqPacket = reinterpret_cast<RAID_MATCHING_RESPONSE*>(recvBuffer);
+            std::cout << "Match Insert Success" << std::endl;
+            std::cout << "Team Waitting" << std::endl;
+            recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+            auto rrReqPacket = reinterpret_cast<RAID_READY_REQUEST*>(recvBuffer);
 
-    //        if (rmReqPacket->insertSuccess) { // Mathing Success
-    //            std::cout << "Found Game" << std::endl;
-    //            recv(userSkt, recvBuffer, PACKET_SIZE, 0);
-    //            auto rrReqPacket = reinterpret_cast<RAID_READY_REQUEST*>(recvBuffer);
-    //            delete rrReqPacket;
+            timer = rrReqPacket->timer; // Minutes
+            roomNum = rrReqPacket->roomNum; // If Max RoomNum Up to Short Range, Back to Number One
+            myNum = rrReqPacket->yourNum;
+            mobHp = rrReqPacket->mobHp;
 
-    //            uint8_t timer = rrReqPacket->timer; // Minutes
-    //            uint8_t roomNum = rrReqPacket->roomNum; // If Max RoomNum Up to Short Range, Back to Number One
-    //            uint8_t myNum = rrReqPacket->yourNum;
-    //            UINT16 udpPort = rrReqPacket->udpPort;   // Server UDP Port Num
-    //            mobHp = rrReqPacket->mobHp;
+            RAID_TEAMINFO_REQUEST rtReq;
+            rtReq.PacketId = (UINT16)PACKET_ID::RAID_TEAMINFO_REQUEST;
+            rtReq.PacketLength = sizeof(RAID_TEAMINFO_REQUEST);
+            rtReq.imReady = true;
+            rtReq.myNum = myNum;
+            rtReq.roomNum = roomNum;
+            rtReq.userAddr = udpAddr;
 
-    //            RAID_TEAMINFO_REQUEST rtReq;
-    //            rtReq.PacketId = (UINT16)PACKET_ID::RAID_TEAMINFO_REQUEST;
-    //            rtReq.PacketLength = sizeof(RAID_TEAMINFO_REQUEST);
-    //            rtReq.uuId = uuId;
-    //            rtReq.imReady = true;
-    //            rtReq.myNum = myNum;
-    //            rtReq.roomNum = roomNum;
+            send(userSkt, (char*)&rtReq, sizeof(rtReq), 0);
+            std::cout << "Team Info Waitting" << std::endl;
+            recv(userSkt, recvBuffer, PACKET_SIZE, 0);
 
-    //            send(userSkt, (char*)&rtReq, sizeof(rtReq), 0);
-    //            std::cout << "Team Info Waitting" << std::endl;
-    //            recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+            auto rtiReqPacket = reinterpret_cast<RAID_TEAMINFO_RESPONSE*>(recvBuffer);
+            uint16_t teamLevel = rtiReqPacket->teamLevel;
+            std::string teamId = (std::string)rtiReqPacket->teamId;
 
-    //            auto rmReqPacket = reinterpret_cast<RAID_TEAMINFO_RESPONSE*>(recvBuffer);
-    //            uint8_t teamLevel = rmReqPacket->teamLevel;
-    //            std::string teamId = rmReqPacket->teamId;
+            std::cout << "Team Waitting" << std::endl;
+            recv(userSkt, recvBuffer, PACKET_SIZE, 0);
 
-    //            std::cout << "Team Waitting" << std::endl;
-    //            recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+            auto rsReqPacket = reinterpret_cast<RAID_START_REQUEST*>(recvBuffer);
 
-    //            unsigned int myScore = 0;
-    //            unsigned int teamScore = 0;
+            unsigned int myScore = 0;
+            unsigned int teamScore = 0;
 
-    //            while (1) {
-    //                std::chrono::time_point<std::chrono::steady_clock> endTime = std::chrono::steady_clock::now() + std::chrono::minutes(timer);
-    //                std::cout << "Raid Start" << std::endl;
-    //                std::cout << "My ID : " << userId <<"Level : " <<level <<  std::endl;
-    //                std::cout << "Team ID : " << teamId << "Level : " <<teamLevel <<  std::endl;
+            std::cout << "Raid Start !" << std::endl;
+            std::cout << "Mob Hp : " << mobHp << std::endl;
+            std::cout << "My ID : " << userId << " / Level : " << level << std::endl;
+            std::cout << "Team ID : " << teamId << " / Level : " << teamLevel << std::endl;
 
-    //                while (mobHp != 0 && (std::chrono::steady_clock::now()<endTime)) { 
-    //                    std::cout << "Input Damage" << std::endl;
-    //                    unsigned int damage;
-    //                    std::cin >> damage;
+            rEndTime = rsReqPacket->endTime;
 
-    //                    RAID_HIT_REQUEST rhReq;
-    //                    rhReq.myNum = myNum;
-    //                    rhReq.roomNum = roomNum;
-    //                    rhReq.damage = damage;
+            while (1) {
+                while (mobHp >= 0 || (std::chrono::steady_clock::now() < rEndTime)) {
+                    std::cout << "Input Damage" << std::endl;
+                    unsigned int damage;
+                    std::cin >> damage;
 
-    //                    send(userSkt, (char*)&rhReq, sizeof(rhReq),0);
-    //                    recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+                    RAID_HIT_REQUEST rhReq;
+                    rhReq.PacketId = (UINT16)PACKET_ID::RAID_HIT_REQUEST;
+                    rhReq.PacketLength = sizeof(RAID_HIT_REQUEST);
+                    rhReq.myNum = myNum;
+                    rhReq.roomNum = roomNum;
+                    rhReq.damage = damage;
 
-    //                    auto rhResPacket = reinterpret_cast<RAID_HIT_RESPONSE*>(recvBuffer);
+                    send(userSkt, (char*)&rhReq, sizeof(rhReq), 0);
+                    recv(userSkt, recvBuffer, PACKET_SIZE, 0);
 
-    //                    if (mobHp.load() > rhResPacket->currentMobHp) mobHp.store(rhResPacket->currentMobHp);
-    //                    myScore = rhResPacket->yourScore;
-    //                    std::cout << "My Socre : " << myScore << std::endl;
-    //                }
+                    auto rhResPacket = reinterpret_cast<RAID_HIT_RESPONSE*>(recvBuffer);
 
-    //                //RAID_END_REQUEST_TO_SERVER rerts;
-    //                //rtReq.PacketId = (UINT16)PACKET_ID::RAID_END_REQUEST_TO_SERVER;
-    //                //rtReq.PacketLength = sizeof(RAID_END_REQUEST_TO_SERVER);
-    //                //rtReq.uuId = uuId;
-    //                //rtReq.roomNum = roomNum;
+                    if (rhResPacket->currentMobHp <= 0) { // mob dead
+                        if (rhResPacket->yourScore !=0) {
+                            std::cout << "My Socre : " << rhResPacket->yourScore << std::endl;
+                        }
+                        std::cout << "Game End Waitting..." << std::endl;
 
-    //                //send(userSkt,(char*)&rerts, sizeof(rerts),0);
-    //                std::cout << "Game End Waitting..." << std::endl;
-    //                recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+                        recv(userSkt, recvBuffer, PACKET_SIZE, 0);
 
-    //                auto rhResPacket = reinterpret_cast<RAID_END_REQUEST*>(recvBuffer);
-
-    //                std::cout << "Raid End. Your Score : "<< rhResPacket->userScore << std::endl;
-    //                std::cout << "Raid End. Team Score : "<< rhResPacket->teamScore << std::endl;
-    //                break;
-    //            }
-    //            mobHp = 0;
-    //        }
-    //        else { // Server Matching Full
-    //            std::cout << "Server Matching Full. Matching Fail" << std::endl;
-    //        }
-    //}
+                        auto reReq = reinterpret_cast<RAID_END_REQUEST*>(recvBuffer);
+                        std::cout << "Raid End. Your Score : " << reReq->userScore << std::endl;
+                        std::cout << "Raid End. Team Score : " << reReq->teamScore << std::endl;
+                        std::cout << "Raid End." << std::endl;
+                        break;
+                    }
+                    else {
+                        if (mobHp.load() > rhResPacket->currentMobHp) mobHp.store(rhResPacket->currentMobHp);
+                        myScore = rhResPacket->yourScore;
+                        std::cout << "My Socre : " << rhResPacket->yourScore << std::endl;
+                    }
+                }
+                break;
+            }
+            mobHp = 0;
+            timer = 0;
+            roomNum = 0;
+            myNum = 0;
+    }
 
     //void GetRaidScore() {
     //    char recvBuffer[PACKET_SIZE];
@@ -550,10 +551,6 @@ public:
     //    }
     //}
 
-    //void GetInventory() {
-
-    //}
-
     void End() {
         char recvBuffer[PACKET_SIZE];
         memset(recvBuffer, 0, PACKET_SIZE);
@@ -567,19 +564,25 @@ public:
 
 private:
     bool WorkRun = false;
-    HANDLE udpHandle;
+    std::atomic<uint16_t> level;
+    std::atomic<unsigned int> exp;
+
+    // Raid
+    std::atomic<int> mobHp;
+    uint16_t timer;
+    uint16_t roomNum; 
+    uint16_t myNum;
 
     SOCKET webSkt;
     SOCKET userSkt;
     SOCKET udpSocket;
+    HANDLE udpHandle;
+    std::thread workThread;
 
+    sockaddr_in udpAddr;
     std::string userId = "quokka";
 
-    std::atomic<uint16_t> level;
-    std::atomic<unsigned int> exp;
-    std::atomic<unsigned int> mobHp;
-
-    std::thread workThread;
+    std::chrono::time_point<std::chrono::steady_clock> rEndTime;
 
     std::vector<EQUIPMENT> eq;
     std::vector<CONSUMABLES> cs;

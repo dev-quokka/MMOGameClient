@@ -236,9 +236,7 @@ struct RAID_READY_REQUEST : PACKET_HEADER {
 	uint16_t timer; // Minutes
 	uint16_t roomNum; // If Max RoomNum Up to Short Range, Back to Number One
 	uint16_t yourNum;
-	uint16_t udpPort;   // Server UDP Port Num
-	unsigned int mobHp;
-	char serverIP[16]; // Server IP Address
+	int mobHp;
 };
 
 struct RAID_TEAMINFO_REQUEST : PACKET_HEADER { // User To Server
@@ -250,7 +248,7 @@ struct RAID_TEAMINFO_REQUEST : PACKET_HEADER { // User To Server
 
 struct RAID_TEAMINFO_RESPONSE : PACKET_HEADER {
 	uint16_t teamLevel;
-	std::string teamId;
+	char teamId[MAX_USER_ID_LEN + 1];
 };
 
 struct RAID_START_REQUEST : PACKET_HEADER {

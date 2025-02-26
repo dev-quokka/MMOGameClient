@@ -79,7 +79,7 @@ int main() {
                 std::cout << "1. 슬롯 이동 " << "2. 강화(장비만)" << "3. 획득" << "4. 삭제" << "5. 뒤로가기" << std::endl;
                 int checknum2;
                 std::cin >> checknum2;
-                if (checknum2 >= 4) break;
+                if (checknum2 >= 5) break;
 
                 if (checknum2 == 1) {
                     std::cout << "위치를 바꾸고 싶은 아이템과 위치를 적어주세요" << std::endl;
@@ -89,7 +89,7 @@ int main() {
                     std::cout << "원하는 위치(1~10) : "; std::cin >> movepos;
                         user.MoveItem(checknum, currentpos, movepos);
                 }
-                else if (checknum2 ==2) {
+                else if (checknum2 == 2) {
                     if (checknum != 1) {
                         std::cout << "장비만 강화 가능 !" << std::endl;
                         continue;
@@ -104,9 +104,6 @@ int main() {
                 else if (checknum2 == 4) {
                    // user.DeleteItem();
                 }
-                else {
-
-                }
 
                 std::cout << std::endl;
                 std::cout << std::endl;
@@ -115,7 +112,11 @@ int main() {
 
         case 3:
         {
-            //user.RaidStart();
+            std::cout << "레이드 매칭을 시작할까요 ? 1번 시작, 2번 뒤로가기" << std::endl;
+            int k;
+            std::cin >> k;
+            if (k >= 2) break;
+            user.RaidStart();
             break;
         }
         case 4: {
