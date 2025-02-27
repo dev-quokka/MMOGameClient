@@ -34,17 +34,23 @@ int main() {
         uint16_t select;
 
         std::cout << "========================" << std::endl;
-        std::cout << "===1. 몹잡기(경험치) ===" << std::endl;
-        std::cout << "===   2. 인벤토리    ===" << std::endl;
-        std::cout << "===   3. 레이드 매칭 ===" << std::endl;
-        std::cout << "===   4. 레이드 랭킹 ===" << std::endl;
-        std::cout << "===   5. 로그아웃    ===" << std::endl;
+        std::cout << "===   1. 내 정보     ===" << std::endl;
+        std::cout << "===2. 몹잡기(경험치) ===" << std::endl;
+        std::cout << "===   3. 인벤토리    ===" << std::endl;
+        std::cout << "===   4. 레이드 매칭 ===" << std::endl;
+        std::cout << "===   5. 레이드 랭킹 ===" << std::endl;
+        std::cout << "===   6. 로그아웃    ===" << std::endl;
         std::cout << "========================" << std::endl;
 
         std::cin >> select;
 
         switch (select) {
         case 1: {
+            user.GetMyInfo();
+            std::cout << std::endl;
+            break;
+        }
+        case 2: {
             user.GetUserLevelExp();
             uint16_t k = 0;
             uint16_t mob = 0;
@@ -67,7 +73,7 @@ int main() {
             }
             break;
         }
-        case 2: {
+        case 3: {
             while (1) {
                 int checknum;
                 std::cout << "원하는 인벤토리 번호 누르고 엔터를 눌러주세요." << std::endl;
@@ -108,9 +114,10 @@ int main() {
                 std::cout << std::endl;
                 std::cout << std::endl;
             }
+            break;
         }
 
-        case 3:
+        case 4:
         {
             std::cout << "레이드 매칭을 시작할까요 ? 1번 시작, 2번 뒤로가기" << std::endl;
             int k;
@@ -119,13 +126,50 @@ int main() {
             user.RaidStart();
             break;
         }
-        case 4: {
-            //user.GetRaidScore();
+        case 5: {
+            uint16_t startNum = 0;
+            uint16_t lastCnt = 0;
+            int checknum;
+            while (1) {
+                if (user.GetRaidScore(startNum)) { // 아직 뒤에 유저 더 남아있을때
+                    if (startNum != 0) {
+                        user.GetRaidScore(startNum);
+                        std::cout << "1. 이전 페이지, 2. 다음 페이지, 3. 뒤로가기" << std::endl;
+                        std::cin >> checknum;
+                        if (checknum == 1) user.GetRaidScore(--startNum);
+                        else if (checknum == 2) user.GetRaidScore(++startNum);
+                        else break;
+                    }
+                    else { // 첫번째 페이지니까 이전페이지 못하게 하기
+                        std::cout << "1. 다음 페이지, 2. 뒤로가기" << std::endl;
+                        std::cin >> checknum;
+                        if (checknum == 1) user.GetRaidScore(++startNum);
+                        else break;
+                    }
+                }
+                else { // 뒤에 유저 더 없을때
+                    if(lastCnt==0) lastCnt = startNum; // 마지막 카운트 체크
+
+                    std::cout << "마지막 랭킹 페이지 입니다 !" << std::endl;
+                    if (startNum != 0) {
+                        user.GetRaidScore(startNum);
+                        std::cout << "1. 이전 페이지, 2. 뒤로가기" << std::endl;
+                        std::cin >> checknum;
+                        if (checknum == 1) user.GetRaidScore(--startNum);
+                        else break;
+                    }
+                    else { // 페이지 하나일때
+                        std::cout << "아무 키를 누르면 뒤로가기" << std::endl;
+                        std::cin >> checknum;
+                        break;
+                    }
+                }
+            }
             break;
         }
-        case 5: {
+        case 6: {
             outCheck = false;
-            user.End();
+            //user.End();
             return 0;
         }
 

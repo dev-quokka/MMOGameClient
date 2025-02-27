@@ -72,6 +72,7 @@ public:
             USERINFO tempU = uiPacket->UserInfo;
             exp = tempU.exp;
             level = tempU.level;
+            raidScore = tempU.raidScore;
 
             if (tempU.level == 0) {
                 std::cout << "Get Userinfo Fail" << std::endl;
@@ -239,6 +240,13 @@ public:
     bool CreateUdpThread() {
         workThread = std::thread([this]() {UdpWorkThread();});
         return true;
+    }
+
+    void GetMyInfo() {
+        std::cout << "아이디 : " << userId << std::endl;
+        std::cout << "레벨 : " << level << std::endl;
+        std::cout << "경험치 : " << exp << std::endl;
+        std::cout << "레이드 최고 점수 : " << raidScore << std::endl;
     }
 
     void MonsterNum(uint16_t mobNum_) {
@@ -494,6 +502,7 @@ public:
                         recv(userSkt, recvBuffer, PACKET_SIZE, 0);
 
                         auto reReq = reinterpret_cast<RAID_END_REQUEST*>(recvBuffer);
+
                         std::cout << "Raid End. Your Score : " << reReq->userScore << std::endl;
                         std::cout << "Raid End. Team Score : " << reReq->teamScore << std::endl;
                         std::cout << "Raid End." << std::endl;
@@ -513,43 +522,36 @@ public:
             myNum = 0;
     }
 
-    //void GetRaidScore() {
-    //    char recvBuffer[PACKET_SIZE];
-    //    memset(recvBuffer, 0, PACKET_SIZE);
+    bool GetRaidScore(uint16_t startNum_) { // 마지막 유저 스코어면 false 반환. 그 뒤 유저 없으니까 체크 x
+        char recvBuffer[PACKET_SIZE];
+        memset(recvBuffer, 0, PACKET_SIZE);
 
-    //    unsigned int startRank_ = 1;
+        RAID_RANKING_REQUEST rrReq;
+        rrReq.PacketId = (UINT16)PACKET_ID::RAID_RANKING_REQUEST;
+        rrReq.PacketLength = sizeof(RAID_RANKING_REQUEST);
+        rrReq.startRank = startNum_;
 
-    //    RAID_RANKING_REQUEST rrReq;
-    //    rrReq.PacketId = (UINT16)PACKET_ID::RAID_RANKING_REQUEST;
-    //    rrReq.PacketLength = sizeof(RAID_RANKING_REQUEST);
-    //    rrReq.uuId = uuId;
+        send(userSkt, (char*)&rrReq, sizeof(rrReq), 0);
+        recv(userSkt, recvBuffer, PACKET_SIZE, 0);
 
-    //    std::vector<std::pair<std::string, unsigned int>> reqScore_;
+        auto reRes = reinterpret_cast<RAID_RANKING_RESPONSE*>(recvBuffer);
+        
+        char* ptr = recvBuffer + sizeof(PACKET_HEADER) + sizeof(uint16_t);
 
-    //    while (1) {
-    //        std::cout << "랭킹확인 1~100" << std::endl;
-    //        rrReq.startRank = startRank_;
-    //        send(userSkt, (char*)&rrReq, sizeof(rrReq), 0);
-    //        recv(userSkt, recvBuffer, PACKET_SIZE, 0);
-    //        auto rhResPacket = reinterpret_cast<RAID_RANKING_RESPONSE*>(recvBuffer);
-    //        reqScore_ = rhResPacket->reqScore;
+        int rank = startNum_ * RANKING_USER_COUNT + 1;
+        std::cout << reRes->rkCount << std::endl;
+        for (int i = rank; i < rank + reRes->rkCount; i++) {
+            RANKING tempR;
+            memcpy((char*)&tempR, ptr, sizeof(RANKING));
+            ptr += sizeof(RANKING);
+            std::cout << i << "등 아이디 : " << (std::string)tempR.userId << " / 점수 : " << tempR.score << std::endl;
+        }
+        std::cout << std::endl;
 
-    //        for(int i = 0; i < reqScore_.size(); i++) {
-    //            std::cout << startRank_+i << "등 아이디 : " << reqScore_[i].first << " 점수 : " << reqScore_[i].second << std::endl;
-    //            startRank_++;
-    //        }
-
-    //        std::cout << "다음 100명 보기 : 1번, 뒤로가기 : 2번" << std::endl;
-    //        uint8_t check;
-    //        std::cin >> check;
-    //        if (check == 1) {
-    //            continue;
-    //        }
-    //        else {
-    //            break;
-    //        }
-    //    }
-    //}
+        if (reRes->rkCount != RANKING_USER_COUNT) return false;
+           
+        return true;
+    }
 
     void End() {
         char recvBuffer[PACKET_SIZE];
@@ -566,6 +568,7 @@ private:
     bool WorkRun = false;
     std::atomic<uint16_t> level;
     std::atomic<unsigned int> exp;
+    unsigned int raidScore;
 
     // Raid
     std::atomic<int> mobHp;

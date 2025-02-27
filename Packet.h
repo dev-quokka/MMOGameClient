@@ -7,7 +7,11 @@
 #include <vector>
 #include <chrono>
 
-const uint16_t PACKET_ID_SIZE = 57; // Last Packet_ID Num + 1
+const uint16_t RANKING_USER_COUNT = 3; // 몇명씩 유저 랭킹 정보 가져올건지
+
+const int MAX_USER_ID_LEN = 32;
+const int MAX_JWT_TOKEN_LEN = 256;
+const int MAX_SCORE_SIZE = 256;
 
 struct PACKET_HEADER
 {
@@ -16,36 +20,35 @@ struct PACKET_HEADER
 };
 
 struct USERINFO {
-	uint16_t level;
-	unsigned int exp;
-	USERINFO() : level(0), exp(0) {}
+	uint16_t level = 0;
+	unsigned int exp = 0;
+	unsigned int raidScore = 0;
 };
 
 struct EQUIPMENT {
-	uint16_t itemCode;
-	uint16_t position;
-	uint16_t enhance;
-	EQUIPMENT() : itemCode(0), position(0), enhance(0) {}
+	uint16_t itemCode = 0;
+	uint16_t position = 0;
+	uint16_t enhance = 0;
 };
 
 struct CONSUMABLES {
-	uint16_t itemCode;
-	uint16_t position;
-	uint16_t count;
-	CONSUMABLES() : itemCode(0), position(0), count(0) {}
+	uint16_t itemCode = 0;
+	uint16_t position = 0;
+	uint16_t count = 0;
 };
 
 struct MATERIALS {
-	uint16_t itemCode;
-	uint16_t position;
-	uint16_t count;
-	MATERIALS() : itemCode(0), position(0), count(0) {}
+	uint16_t itemCode = 0;
+	uint16_t position = 0;
+	uint16_t count = 0;
+};
+
+struct RANKING {
+	uint16_t score = 0;
+	char userId[MAX_USER_ID_LEN + 1] = {};
 };
 
 //  ---------------------------- SYSTEM  ----------------------------
-
-const int MAX_USER_ID_LEN = 32;
-const int MAX_JWT_TOKEN_LEN = 256;
 
 struct USER_CONNECT_REQUEST_PACKET : PACKET_HEADER {
 	char userId[MAX_USER_ID_LEN + 1];
@@ -276,11 +279,12 @@ struct RAID_END_RESPONSE : PACKET_HEADER { // User to Server (If Server Get This
 };
 
 struct RAID_RANKING_REQUEST : PACKET_HEADER {
-	unsigned int startRank;
+	uint16_t startRank;
 };
 
 struct RAID_RANKING_RESPONSE : PACKET_HEADER {
-	std::vector<std::pair<std::string, unsigned int>> reqScore;
+	uint16_t rkCount;
+	char reqScore[MAX_SCORE_SIZE + 1];
 };
 
 enum class WEBPACKET_ID : uint16_t {
