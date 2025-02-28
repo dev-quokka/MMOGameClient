@@ -93,7 +93,7 @@ int main() {
                     int movepos;
                     std::cout << "위치 변경 희망하는 아이템 위치 : "; std::cin >> currentpos;
                     std::cout << "원하는 위치(1~10) : "; std::cin >> movepos;
-                        user.MoveItem(checknum, currentpos, movepos);
+                    user.MoveItem(checknum, currentpos, movepos);
                 }
                 else if (checknum2 == 2) {
                     if (checknum != 1) {
@@ -108,7 +108,7 @@ int main() {
                     //user.AddItem();
                 }
                 else if (checknum2 == 4) {
-                   // user.DeleteItem();
+                    // user.DeleteItem();
                 }
 
                 std::cout << std::endl;
@@ -133,29 +133,27 @@ int main() {
             while (1) {
                 if (user.GetRaidScore(startNum)) { // 아직 뒤에 유저 더 남아있을때
                     if (startNum != 0) {
-                        user.GetRaidScore(startNum);
                         std::cout << "1. 이전 페이지, 2. 다음 페이지, 3. 뒤로가기" << std::endl;
                         std::cin >> checknum;
-                        if (checknum == 1) user.GetRaidScore(--startNum);
-                        else if (checknum == 2) user.GetRaidScore(++startNum);
+                        if (checknum == 1) --startNum;
+                        else if (checknum == 2) ++startNum;
                         else break;
                     }
                     else { // 첫번째 페이지니까 이전페이지 못하게 하기
                         std::cout << "1. 다음 페이지, 2. 뒤로가기" << std::endl;
                         std::cin >> checknum;
-                        if (checknum == 1) user.GetRaidScore(++startNum);
+                        if (checknum == 1) ++startNum;
                         else break;
                     }
                 }
                 else { // 뒤에 유저 더 없을때
-                    if(lastCnt==0) lastCnt = startNum; // 마지막 카운트 체크
+                    if (lastCnt == 0) lastCnt = startNum; // 마지막 카운트 체크
 
                     std::cout << "마지막 랭킹 페이지 입니다 !" << std::endl;
                     if (startNum != 0) {
-                        user.GetRaidScore(startNum);
                         std::cout << "1. 이전 페이지, 2. 뒤로가기" << std::endl;
                         std::cin >> checknum;
-                        if (checknum == 1) user.GetRaidScore(--startNum);
+                        if (checknum == 1) --startNum;
                         else break;
                     }
                     else { // 페이지 하나일때
