@@ -26,8 +26,7 @@ int main() {
         return 0;
     }
 
-    bool outCheck = false;
-    outCheck = true;
+    bool outCheck = true;
 
     while (outCheck) {
         std::cout << std::endl;
@@ -105,7 +104,30 @@ int main() {
                     }
                 }
                 else if (checknum2 == 3) {
-                    //user.AddItem();
+                    if (checknum==1) { // 장비 add
+                        uint16_t code;
+                        uint16_t enhancement;
+                        std::cout << "원하는 아이템 코드 : "; std::cin >> code;
+                        std::cout << "원하는 아이템 강화 수 : "; std::cin >> enhancement;
+                        if (user.AddEquipment(code, enhancement)) {
+                            std::cout << "아이템 획득 성공 !" << std::endl;
+                        }
+                        else {
+                            std::cout << "아이템 획득 실패 !" << std::endl;
+                        }
+                    }
+                    else { // 소비, 재료 add
+                        uint16_t code;
+                        uint16_t count;
+                        std::cout << "원하는 아이템 코드 : "; std::cin >> code;
+                        std::cout << "원하는 아이템 개수 : "; std::cin >> count;
+                        if (user.AddItem(checknum,code, count)) {
+                            std::cout << "아이템 획득 성공 !" << std::endl;
+                        }
+                        else {
+                            std::cout << "아이템 획득 실패 !" << std::endl;
+                        }
+                    }
                 }
                 else if (checknum2 == 4) {
                     // user.DeleteItem();
@@ -168,12 +190,9 @@ int main() {
         case 6: {
             outCheck = false;
             //user.End();
-            return 0;
         }
-
         }
     }
-
     return 0;
 }
 

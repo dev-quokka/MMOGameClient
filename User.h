@@ -13,17 +13,19 @@
 
 #pragma comment(lib, "ws2_32.lib") // 비주얼에서 소켓프로그래밍 하기 위한 것
 
+const uint16_t INVENTORY_SIZE = 11; // 10개면 +1해서 11개로 해두기
+
 class User {
 public:
     ~User() {
-        char recvBuffer[PACKET_SIZE];
-        memset(recvBuffer, 0, PACKET_SIZE);
+        //char recvBuffer[PACKET_SIZE];
+        //memset(recvBuffer, 0, PACKET_SIZE);
 
-        USER_LOGOUT_REQUEST_PACKET ulReq;
-        ulReq.PacketId = (UINT16)PACKET_ID::USER_LOGOUT_REQUEST;
-        ulReq.PacketLength = sizeof(USER_LOGOUT_REQUEST_PACKET);
+        //USER_LOGOUT_REQUEST_PACKET ulReq;
+        //ulReq.PacketId = (UINT16)PACKET_ID::USER_LOGOUT_REQUEST;
+        //ulReq.PacketLength = sizeof(USER_LOGOUT_REQUEST_PACKET);
 
-        send(userSkt, (char*)&ulReq, sizeof(ulReq), 0);
+        //send(userSkt, (char*)&ulReq, sizeof(ulReq), 0);
 
         WorkRun = false;
         if (workThread.joinable()) workThread.join();
@@ -90,7 +92,7 @@ public:
         auto eqPacket = reinterpret_cast<EQUIPMENT_RESPONSE*>(recvBuffer);
         char* ptr = recvBuffer + sizeof(PACKET_HEADER) + sizeof(uint16_t);
 
-        eq.resize(10);
+        eq.resize(INVENTORY_SIZE);
 
         for (int i = 0; i < eqPacket->eqCount; i++) {
             EQUIPMENT tempE;
@@ -113,7 +115,7 @@ public:
         std::vector<CONSUMABLES> tempCs(csPacket->csCount);
         char* ptr2 = recvBuffer + sizeof(PACKET_HEADER) + sizeof(uint16_t);
 
-        cs.resize(10);
+        cs.resize(INVENTORY_SIZE);
 
         for (int i = 0; i < eqPacket->eqCount; i++) {
             CONSUMABLES tempCon;
@@ -141,7 +143,7 @@ public:
         std::vector<MATERIALS> tempMt(mtPacket->mtCount);
         char* ptr3 = recvBuffer + sizeof(PACKET_HEADER) + sizeof(uint16_t);
 
-        mt.resize(10);
+        mt.resize(INVENTORY_SIZE);
 
         for (int i = 0; i < eqPacket->eqCount; i++) {
             MATERIALS tempM;
@@ -282,10 +284,6 @@ public:
         return { level, exp };
     }
 
-    //void UDPRecv() {
-
-    //}
-
     void UdpWorkThread() {
         std::cout << "Start Udp Work Thread" << std::endl;
         LPOVERLAPPED lpOverlapped = NULL;
@@ -302,7 +300,7 @@ public:
             );
 
             auto overlapped = (OverlappedUDP*)lpOverlapped;
-            std::cout << "들어옴?" << std::endl;
+
             if (overlapped->taskType == TaskType::UDP_RECV) { // 레이드 몹 hp 동기화 요청
                 auto hp = reinterpret_cast<unsigned int*>(overlapped->wsaBuf.buf);
                 std::cout << "Current Mob Hp : " << mobHp << std::endl;
@@ -348,11 +346,11 @@ public:
             EQUIPMENT moveE = eq[movepos_];
 
             miReq.dragItemCode = moveE.itemCode;
-            miReq.dragItemEnhance = moveE.enhance;
-            miReq.dragItemSlotPos = currentE.position;
+            miReq.dragItemEnhancement = moveE.enhance;
+            miReq.dragItemPos = currentE.position;
             miReq.targetItemCode = currentE.itemCode;
-            miReq.targetItemEnhance = currentE.enhance;
-            miReq.targetItemSlotPos = moveE.position;
+            miReq.targetItemEnhancement = currentE.enhance;
+            miReq.targetItemPos = moveE.position;
 
             send(userSkt, (char*)&miReq, sizeof(miReq), 0);
             recv(userSkt, recvBuffer, PACKET_SIZE, 0);
@@ -360,6 +358,10 @@ public:
             auto miResPacket = reinterpret_cast<MOV_EQUIPMENT_RESPONSE*>(recvBuffer);
 
             if (!miResPacket->isSuccess) return false;
+
+            eq[currentpos_] = moveE;
+            eq[movepos_] = currentE;
+
             return true;
         }
         else { // 소비 or 재료
@@ -374,10 +376,10 @@ public:
                 miReq.ItemType = invenNum_ - 1;
                 miReq.dragItemCode = moveC.itemCode;
                 miReq.dragItemCount = moveC.count;
-                miReq.dragItemSlotPos = currentC.position;
+                miReq.dragItemPos = currentC.position;
                 miReq.targetItemCode = currentC.itemCode;
                 miReq.targetItemCount = currentC.count;
-                miReq.targetItemSlotPos = moveC.position;
+                miReq.targetItemPos = moveC.position;
 
                 send(userSkt, (char*)&miReq, sizeof(miReq), 0);
                 recv(userSkt, recvBuffer, PACKET_SIZE, 0);
@@ -394,10 +396,10 @@ public:
                 miReq.ItemType = invenNum_ - 1;
                 miReq.dragItemCode = moveE.itemCode;
                 miReq.dragItemCount = moveE.count;
-                miReq.dragItemSlotPos = currentE.position;
+                miReq.dragItemPos = currentE.position;
                 miReq.targetItemCode = currentE.itemCode;
                 miReq.targetItemCount = currentE.count;
-                miReq.targetItemSlotPos = moveE.position;
+                miReq.targetItemPos = moveE.position;
 
                 send(userSkt, (char*)&miReq, sizeof(miReq), 0);
                 recv(userSkt, recvBuffer, PACKET_SIZE, 0);
@@ -410,11 +412,156 @@ public:
         }
     }
 
-    bool AddItem(uint16_t invenNum_, uint16_t itemCode_, uint16_t count_) {
+    bool AddEquipment(uint16_t itemCode_, uint16_t enhancement_) {
+        ADD_EQUIPMENT_REQUEST aeReq;
+        aeReq.PacketId = (UINT16)PACKET_ID::ADD_EQUIPMENT_REQUEST;
+        aeReq.PacketLength = sizeof(ADD_EQUIPMENT_REQUEST);
 
+        uint16_t addPosition = INVENTORY_SIZE + 1;
+
+        for (int i = 1; i < INVENTORY_SIZE; i++) {
+            if (eq[i].itemCode == 0) {
+                addPosition = i;
+                break;
+            }
+        }
+
+        if (addPosition == INVENTORY_SIZE + 1) { // 넣을 공간 없으면 false 반환
+            std::cout << "Equipments Full" << std::endl;
+            return false;
+        }
+
+        aeReq.itemCode = itemCode_;
+        aeReq.itemPosition = addPosition;
+        aeReq.Enhancement = enhancement_;
+
+        send(userSkt, (char*)&aeReq, sizeof(aeReq), 0);
+        recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+
+        auto miResPacket = reinterpret_cast<ADD_EQUIPMENT_RESPONSE*>(recvBuffer);
+
+        if (!miResPacket->isSuccess) return false;
+
+        EQUIPMENT tempE;
+        tempE.itemCode = itemCode_;
+        tempE.position = addPosition;
+        tempE.enhance = enhancement_;
+
+        eq[addPosition] = tempE;
+
+        return true;
+    }
+
+    bool AddItem(uint16_t invenNum_, uint16_t itemCode_, uint16_t count_) {
+            ADD_ITEM_REQUEST aiReq;
+            aiReq.PacketId = (UINT16)PACKET_ID::ADD_ITEM_REQUEST;
+            aiReq.PacketLength = sizeof(ADD_ITEM_REQUEST);
+
+            if (invenNum_ == 2) { // 소비
+                uint16_t addPosition = 0;
+                uint16_t addCount = count_;
+
+                for (int i = 1; i < INVENTORY_SIZE; i++) {
+                    if (cs[i].itemCode == itemCode_) {
+                        addPosition = i;
+                        addCount += cs[i].count;
+                        break;
+                    }
+                }
+
+                if (count_ == addCount) {
+                    for (int i = 1; i < INVENTORY_SIZE; i++) {
+                        if (cs[i].itemCode == 0) {
+                            addPosition = i;
+                            break;
+                        }
+                    }
+                }
+
+                if (addPosition == 0) { // 넣을 공간 없으면 false 반환
+                    std::cout << "Consumables Full" << std::endl;
+                    return false;
+                }
+
+                aiReq.itemType = invenNum_ - 1;
+                aiReq.itemCode = itemCode_;
+                aiReq.itemPosition = addPosition;
+                aiReq.itemCount = addCount;
+
+                send(userSkt, (char*)&aiReq, sizeof(aiReq), 0);
+                recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+
+                auto miResPacket = reinterpret_cast<ADD_ITEM_RESPONSE*>(recvBuffer);
+
+                if (!miResPacket->isSuccess) return false;
+
+                CONSUMABLES tempC;
+                tempC.itemCode = itemCode_;
+                tempC.position = addPosition;
+                tempC.count = addCount;
+
+                cs[addPosition] = tempC;
+
+                return true;
+            }
+            else if (invenNum_ == 3) {
+                uint16_t addPosition = 0;
+                uint16_t addCount = count_;
+
+                for (int i = 1; i < INVENTORY_SIZE; i++) {
+                    if (mt[i].itemCode == itemCode_) {
+                        addPosition = i;
+                        addCount += mt[i].count;
+                        break;
+                    }
+                }
+
+                if (count_ == addCount) {
+                    for (int i = 1; i < INVENTORY_SIZE; i++) {
+                        if (mt[i].itemCode == 0) {
+                            addPosition = i;
+                            break;
+                        }
+                    }
+                }
+
+                if (addPosition == 0) { // 넣을 공간 없으면 false 반환
+                    std::cout << "Materials Full" << std::endl;
+                    return false;
+                }
+
+                aiReq.itemType = invenNum_ - 1;
+                aiReq.itemCode = itemCode_;
+                aiReq.itemPosition = addPosition;
+                aiReq.itemCount = count_;
+
+                send(userSkt, (char*)&aiReq, sizeof(aiReq), 0);
+                recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+
+                auto miResPacket = reinterpret_cast<ADD_ITEM_RESPONSE*>(recvBuffer);
+
+                if (!miResPacket->isSuccess) return false;
+
+                MATERIALS tempM;
+                tempM.itemCode = itemCode_;
+                tempM.position = addPosition;
+                tempM.count = addCount;
+
+                mt[addPosition] = tempM;
+
+                return true;
+            }
     }
 
     bool DeleteItem(uint16_t invenNum_, uint16_t pos_) {
+
+    }
+
+    bool EnhanceItem(uint16_t pos_) { // Equipment Only
+
+    }
+
+    bool UserItem(uint16_t pos_, uint16_t count_) { // Consumables, Materials Only
 
     }
 
