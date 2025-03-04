@@ -29,7 +29,7 @@ public:
 
         WorkRun = false;
         if (workThread.joinable()) workThread.join();
-        std::this_thread::sleep_for(std::chrono::seconds(3));
+        std::this_thread::sleep_for(std::chrono::seconds(2));
         CloseHandle(udpHandle);
         closesocket(userSkt);
         closesocket(udpSocket);
@@ -92,7 +92,9 @@ public:
         auto eqPacket = reinterpret_cast<EQUIPMENT_RESPONSE*>(recvBuffer);
         char* ptr = recvBuffer + sizeof(PACKET_HEADER) + sizeof(uint16_t);
 
-        eq.resize(INVENTORY_SIZE);
+        for (int i = 1; i < INVENTORY_SIZE; i++) {
+            eq[i].position = i;
+        }
 
         for (int i = 0; i < eqPacket->eqCount; i++) {
             EQUIPMENT tempE;
@@ -115,7 +117,9 @@ public:
         std::vector<CONSUMABLES> tempCs(csPacket->csCount);
         char* ptr2 = recvBuffer + sizeof(PACKET_HEADER) + sizeof(uint16_t);
 
-        cs.resize(INVENTORY_SIZE);
+        for (int i = 1; i < INVENTORY_SIZE; i++) {
+            cs[i].position = i;
+        }
 
         for (int i = 0; i < eqPacket->eqCount; i++) {
             CONSUMABLES tempCon;
@@ -123,11 +127,6 @@ public:
             cs[tempCon.position] = tempCon;
             ptr2 += sizeof(CONSUMABLES);
         }
-
-        //if (cs.empty()) {
-        //    std::cout << "Get CONSUMABLES Fail" << std::endl;
-        //    return false;
-        //}
 
         std::cout << "Get CONSUMABLES Success" << std::endl;
 
@@ -143,7 +142,9 @@ public:
         std::vector<MATERIALS> tempMt(mtPacket->mtCount);
         char* ptr3 = recvBuffer + sizeof(PACKET_HEADER) + sizeof(uint16_t);
 
-        mt.resize(INVENTORY_SIZE);
+        for (int i = 1; i < INVENTORY_SIZE; i++) {
+            mt[i].position = i;
+        }
 
         for (int i = 0; i < eqPacket->eqCount; i++) {
             MATERIALS tempM;
@@ -359,6 +360,9 @@ public:
 
             if (!miResPacket->isSuccess) return false;
 
+            moveE.position = miReq.dragItemPos;
+            currentE.position = miReq.targetItemPos;
+
             eq[currentpos_] = moveE;
             eq[movepos_] = currentE;
 
@@ -387,19 +391,26 @@ public:
                 auto miResPacket = reinterpret_cast<MOV_ITEM_RESPONSE*>(recvBuffer);
 
                 if (!miResPacket->isSuccess) return false;
+
+                moveC.position = miReq.dragItemPos;
+                currentC.position = miReq.targetItemPos;
+
+                cs[currentpos_] = moveC;
+                cs[movepos_] = currentC;
+
                 return true;
             }
             else if (invenNum_ == 3) {
-                MATERIALS currentE = mt[currentpos_];
-                MATERIALS moveE = mt[movepos_];
+                MATERIALS currentM = mt[currentpos_];
+                MATERIALS moveM = mt[movepos_];
 
                 miReq.ItemType = invenNum_ - 1;
-                miReq.dragItemCode = moveE.itemCode;
-                miReq.dragItemCount = moveE.count;
-                miReq.dragItemPos = currentE.position;
-                miReq.targetItemCode = currentE.itemCode;
-                miReq.targetItemCount = currentE.count;
-                miReq.targetItemPos = moveE.position;
+                miReq.dragItemCode = moveM.itemCode;
+                miReq.dragItemCount = moveM.count;
+                miReq.dragItemPos = currentM.position;
+                miReq.targetItemCode = currentM.itemCode;
+                miReq.targetItemCount = currentM.count;
+                miReq.targetItemPos = moveM.position;
 
                 send(userSkt, (char*)&miReq, sizeof(miReq), 0);
                 recv(userSkt, recvBuffer, PACKET_SIZE, 0);
@@ -407,6 +418,13 @@ public:
                 auto miResPacket = reinterpret_cast<MOV_ITEM_RESPONSE*>(recvBuffer);
 
                 if (!miResPacket->isSuccess) return false;
+
+                moveM.position = miReq.dragItemPos;
+                currentM.position = miReq.targetItemPos;
+
+                mt[currentpos_] = moveM;
+                mt[movepos_] = currentM;
+
                 return true;
             }
         }
@@ -557,8 +575,28 @@ public:
 
     }
 
-    bool EnhanceItem(uint16_t pos_) { // Equipment Only
+    bool EnhanceEquip(uint16_t pos_) { // Equipment Only
+        ENH_EQUIPMENT_REQUEST enhReq;
+        enhReq.PacketId = (UINT16)PACKET_ID::ENH_EQUIPMENT_REQUEST;
+        enhReq.PacketLength = sizeof(ENH_EQUIPMENT_REQUEST);
+        enhReq.itemPosition = pos_;
 
+        send(userSkt, (char*)&enhReq, sizeof(enhReq), 0);
+        recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+
+        std::cout << "강화중 ,," << std::endl;
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+
+        auto enhResPacket = reinterpret_cast<ENH_EQUIPMENT_RESPONSE*>(recvBuffer);
+
+        if (!enhResPacket->isSuccess) {
+            return false;
+        }
+
+        eq[pos_].enhance = enhResPacket->Enhancement;
+        std::cout << "+" << enhResPacket->Enhancement << "로 강화 성공" << std::endl;
+
+        return true;
     }
 
     bool UserItem(uint16_t pos_, uint16_t count_) { // Consumables, Materials Only
@@ -756,9 +794,9 @@ private:
 
     std::chrono::time_point<std::chrono::steady_clock> rEndTime;
 
-    std::vector<EQUIPMENT> eq;
-    std::vector<CONSUMABLES> cs;
-    std::vector<MATERIALS> mt;
+    std::vector<EQUIPMENT> eq{INVENTORY_SIZE};
+    std::vector<CONSUMABLES> cs{ INVENTORY_SIZE };
+    std::vector<MATERIALS> mt{ INVENTORY_SIZE };
 
     char recvBuffer[PACKET_SIZE];
 };

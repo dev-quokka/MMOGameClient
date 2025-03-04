@@ -99,9 +99,14 @@ int main() {
                         std::cout << "장비만 강화 가능 !" << std::endl;
                         continue;
                     }
-                    else {
+                    std::cout << "강화하고 싶은 장비의 슬롯을 입력해주세요." << std::endl;
+                    uint16_t currentpos;
+                    std::cout << "강화하고 싶은 장비 아이템 위치 : "; std::cin >> currentpos;
 
+                    if (!user.EnhanceEquip(currentpos)) {
+                        std::cout << "강화 실패 !" << std::endl;
                     }
+
                 }
                 else if (checknum2 == 3) {
                     if (checknum==1) { // 장비 add
