@@ -18,15 +18,6 @@ const uint16_t INVENTORY_SIZE = 11; // 10개면 +1해서 11개로 해두기
 class User {
 public:
     ~User() {
-        //char recvBuffer[PACKET_SIZE];
-        //memset(recvBuffer, 0, PACKET_SIZE);
-
-        //USER_LOGOUT_REQUEST_PACKET ulReq;
-        //ulReq.PacketId = (UINT16)PACKET_ID::USER_LOGOUT_REQUEST;
-        //ulReq.PacketLength = sizeof(USER_LOGOUT_REQUEST_PACKET);
-
-        //send(userSkt, (char*)&ulReq, sizeof(ulReq), 0);
-
         WorkRun = false;
         if (workThread.joinable()) workThread.join();
         std::this_thread::sleep_for(std::chrono::seconds(2));
@@ -40,8 +31,8 @@ public:
         WSADATA wsaData;
         WSAStartup(MAKEWORD(2, 2), &wsaData);
 
-        webSkt = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-        if (webSkt == INVALID_SOCKET) {
+        sessionSkt = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (sessionSkt == INVALID_SOCKET) {
             std::cout << "Server Socket Make Fail" << std::endl;
             return false;
         }
@@ -49,26 +40,26 @@ public:
         SOCKADDR_IN addr;
         ZeroMemory(&addr, sizeof(addr));
         addr.sin_family = AF_INET;
-        addr.sin_port = htons(WEB_SERVER_PORT);
+        addr.sin_port = htons(SESSION_SERVER_PORT);
         inet_pton(AF_INET, SERVER_IP, &addr.sin_addr.s_addr);
 
-        std::cout << "Web Server Connecting..." << std::endl;
+        std::cout << "Session Server Connecting..." << std::endl;
 
-        if (connect(webSkt, (SOCKADDR*)&addr, sizeof(addr))) {
-            std::cout << "WebServer Connect Fail" << std::endl;
+        if (connect(sessionSkt, (SOCKADDR*)&addr, sizeof(addr))) {
+            std::cout << "Session Server Connect Fail" << std::endl;
             return false;
         }
-        std::cout << "Web Server Connect Success" << std::endl;
+        std::cout << "Session Server Connect Success" << std::endl;
 
         memset(recvBuffer, 0, PACKET_SIZE);
 
         USERINFO_REQUEST uiReq;
-        uiReq.PacketId = (UINT16)WEBPACKET_ID::USERINFO_REQUEST;
+        uiReq.PacketId = (UINT16)SESSIONPACKET_ID::USERINFO_REQUEST;
         uiReq.PacketLength = sizeof(USERINFO_REQUEST);
         strncpy_s(uiReq.userId, userId.c_str(), MAX_USER_ID_LEN);
 
-        send(webSkt, (char*)&uiReq, sizeof(uiReq), 0); // 유저 정보 요청
-        recv(webSkt, recvBuffer, PACKET_SIZE, 0); // 유저 정보
+        send(sessionSkt, (char*)&uiReq, sizeof(uiReq), 0); // 유저 정보 요청
+        recv(sessionSkt, recvBuffer, PACKET_SIZE, 0); // 유저 정보
 
         auto uiPacket = reinterpret_cast<USERINFO_RESPONSE*>(recvBuffer);
         USERINFO tempU = uiPacket->UserInfo;
@@ -83,11 +74,11 @@ public:
         std::cout << "Get Userinfo Success" << std::endl;
 
         EQUIPMENT_REQUEST eqReq;
-        eqReq.PacketId = (UINT16)WEBPACKET_ID::EQUIPMENT_REQUEST;
+        eqReq.PacketId = (UINT16)SESSIONPACKET_ID::EQUIPMENT_REQUEST;
         eqReq.PacketLength = sizeof(EQUIPMENT_REQUEST);
 
-        send(webSkt, (char*)&eqReq, sizeof(eqReq), 0); // 장비 정보 요청
-        recv(webSkt, recvBuffer, PACKET_SIZE, 0); // 장비 정보
+        send(sessionSkt, (char*)&eqReq, sizeof(eqReq), 0); // 장비 정보 요청
+        recv(sessionSkt, recvBuffer, PACKET_SIZE, 0); // 장비 정보
 
         auto eqPacket = reinterpret_cast<EQUIPMENT_RESPONSE*>(recvBuffer);
         char* ptr = recvBuffer + sizeof(PACKET_HEADER) + sizeof(uint16_t);
@@ -106,11 +97,11 @@ public:
         std::cout << "Get EQUIPMENT Success" << std::endl;
 
         CONSUMABLES_REQUEST csReq;
-        csReq.PacketId = (UINT16)WEBPACKET_ID::CONSUMABLES_REQUEST;
+        csReq.PacketId = (UINT16)SESSIONPACKET_ID::CONSUMABLES_REQUEST;
         csReq.PacketLength = sizeof(CONSUMABLES_REQUEST);
 
-        send(webSkt, (char*)&csReq, sizeof(csReq), 0);
-        recv(webSkt, recvBuffer, PACKET_SIZE, 0); // 소비 정보
+        send(sessionSkt, (char*)&csReq, sizeof(csReq), 0);
+        recv(sessionSkt, recvBuffer, PACKET_SIZE, 0); // 소비 정보
 
         auto csPacket = reinterpret_cast<CONSUMABLES_RESPONSE*>(recvBuffer);
 
@@ -131,11 +122,11 @@ public:
         std::cout << "Get CONSUMABLES Success" << std::endl;
 
         MATERIALS_REQUEST mtReq;
-        mtReq.PacketId = (UINT16)WEBPACKET_ID::MATERIALS_REQUEST;
+        mtReq.PacketId = (UINT16)SESSIONPACKET_ID::MATERIALS_REQUEST;
         mtReq.PacketLength = sizeof(MATERIALS_REQUEST);
 
-        send(webSkt, (char*)&mtReq, sizeof(mtReq), 0);
-        recv(webSkt, recvBuffer, PACKET_SIZE, 0); // 재료 정보
+        send(sessionSkt, (char*)&mtReq, sizeof(mtReq), 0);
+        recv(sessionSkt, recvBuffer, PACKET_SIZE, 0); // 재료 정보
 
         auto mtPacket = reinterpret_cast<MATERIALS_RESPONSE*>(recvBuffer);
 
@@ -161,27 +152,26 @@ public:
         std::cout << "Get MATERIALS Success" << std::endl;
 
         USER_GAMESTART_REQUEST ugReq;
-        ugReq.PacketId = (UINT16)WEBPACKET_ID::USER_GAMESTART_REQUEST;
+        ugReq.PacketId = (UINT16)SESSIONPACKET_ID::USER_GAMESTART_REQUEST;
         ugReq.PacketLength = sizeof(USER_GAMESTART_REQUEST);
         strncpy_s(ugReq.userId, userId.c_str(), MAX_USER_ID_LEN);
 
-        send(webSkt, (char*)&ugReq, sizeof(ugReq), 0); // 게임 시작 준비 요청
-        recv(webSkt, recvBuffer, PACKET_SIZE, 0); // 게임 시작을 위한 웹 토큰
+        send(sessionSkt, (char*)&ugReq, sizeof(ugReq), 0); // 게임 시작 준비 요청
+        recv(sessionSkt, recvBuffer, PACKET_SIZE, 0); // 게임 시작을 위한 웹 토큰
 
-        // GET USER UUID
         auto ucReqPacket = reinterpret_cast<USER_GAMESTART_RESPONSE*>(recvBuffer);
 
-        std::string webToken = ucReqPacket->webToken;
+        std::string Token = ucReqPacket->Token;
 
-        if (webToken == "") { // 웹서버에서 토큰 생성 실패
-            std::cout << "Get WebToken Fail" << std::endl;
+        if (Token == "") { // 세션 서버에서 토큰 생성 실패
+            std::cout << "Get Token Fail" << std::endl;
             return false;
         }
 
         std::cout << "Connect Success" << std::endl;
 
-        shutdown(webSkt, SD_BOTH);
-        closesocket(webSkt); // 웹서버 소켓 닫기
+        shutdown(sessionSkt, SD_BOTH);
+        closesocket(sessionSkt); // 세션 서버 소켓 닫기
 
         std::cout << "If you Press 1, game start. If you want out, press any key" << std::endl;
 
@@ -207,7 +197,7 @@ public:
         ucReq.PacketId = (UINT16)PACKET_ID::USER_CONNECT_REQUEST;
         ucReq.PacketLength = sizeof(USER_CONNECT_REQUEST_PACKET);
         strncpy_s(ucReq.userId, userId.c_str(), MAX_USER_ID_LEN);
-        strncpy_s(ucReq.userToken, webToken.c_str(), MAX_JWT_TOKEN_LEN);
+        strncpy_s(ucReq.userToken, Token.c_str(), MAX_JWT_TOKEN_LEN);
 
         std::cout << "Connect Requset To Game Server.." << std::endl;
 
@@ -252,7 +242,7 @@ public:
         std::cout << "레이드 최고 점수 : " << raidScore << std::endl;
     }
 
-    void MonsterNum(uint16_t mobNum_) {
+    void AddExpFromMob(uint16_t mobNum_) {
         EXP_UP_REQUEST euReq;
         euReq.PacketId = (UINT16)PACKET_ID::EXP_UP_REQUEST;
         euReq.PacketLength = sizeof(EXP_UP_REQUEST);
@@ -572,7 +562,59 @@ public:
     }
 
     bool DeleteItem(uint16_t invenNum_, uint16_t pos_) {
+        DEL_ITEM_REQUEST delReq;
+        delReq.PacketId = (UINT16)PACKET_ID::DEL_ITEM_REQUEST;
+        delReq.PacketLength = sizeof(DEL_ITEM_REQUEST);
+        delReq.itemPosition = pos_;
 
+        if (invenNum_ == 1) {
+            DEL_EQUIPMENT_REQUEST delEReq;
+            delEReq.PacketId = (UINT16)PACKET_ID::DEL_EQUIPMENT_REQUEST;
+            delEReq.PacketLength = sizeof(DEL_EQUIPMENT_REQUEST);
+            delEReq.itemPosition = pos_;
+
+            send(userSkt, (char*)&delEReq, sizeof(delEReq), 0);
+            recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+
+            auto enhResPacket = reinterpret_cast<DEL_EQUIPMENT_RESPONSE*>(recvBuffer);
+
+            if (!enhResPacket->isSuccess) return false;
+
+            eq[pos_].enhance = 0;
+            eq[pos_].itemCode = 0;
+
+            return true;
+        }
+        else if (invenNum_ == 2) {
+            delReq.itemType = invenNum_ - 1;
+
+            send(userSkt, (char*)&delReq, sizeof(delReq), 0);
+            recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+
+            auto delResPacket = reinterpret_cast<DEL_ITEM_RESPONSE*>(recvBuffer);
+
+            if (!delResPacket->isSuccess) return false;
+
+            cs[pos_].count = 0;
+            cs[pos_].itemCode = 0;
+
+            return true;
+        }
+        else if (invenNum_ == 3) {
+            delReq.itemType = invenNum_ - 1;
+
+            send(userSkt, (char*)&delReq, sizeof(delReq), 0);
+            recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+
+            auto delResPacket = reinterpret_cast<DEL_ITEM_RESPONSE*>(recvBuffer);
+
+            if (!delResPacket->isSuccess) return false;
+
+            mt[pos_].count = 0;
+            mt[pos_].itemCode = 0;
+
+            return true;
+        }
     }
 
     bool EnhanceEquip(uint16_t pos_) { // Equipment Only
@@ -783,7 +825,7 @@ private:
     uint16_t roomNum;
     uint16_t myNum;
 
-    SOCKET webSkt;
+    SOCKET sessionSkt;
     SOCKET userSkt;
     SOCKET udpSocket;
     HANDLE udpHandle;

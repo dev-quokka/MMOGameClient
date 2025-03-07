@@ -2,7 +2,7 @@
 
 #define SERVER_IP "127.0.0.1"
 #define SERVER_TCP_PORT 9090
-#define WEB_SERVER_PORT 9091
+#define SESSION_SERVER_PORT 9091
 #define SERVER_UDP_PORT 50000
 #define PACKET_SIZE 1024
 
@@ -60,7 +60,7 @@ int main() {
                     std::cout << "경험치 1~5의 몬스터를 잡으려면 번호 입력" << std::endl;
                     std::cin >> mob;
                     if (mob >= 1 && mob <= 5) {
-                        user.MonsterNum(mob);
+                        user.AddExpFromMob(mob);
                     }
                     else {
                         std::cout << "잘못된 몬스터 번호 ! 다시입력" << std::endl;
@@ -135,9 +135,17 @@ int main() {
                     }
                 }
                 else if (checknum2 == 4) {
-                    // user.DeleteItem();
-                }
+                    std::cout << "삭제하고 싶은 장비의 슬롯을 입력해주세요." << std::endl;
+                    uint16_t currentpos;
+                    uint16_t check;
+                    std::cout << "삭제하고 싶은 장비 아이템 위치 : "; std::cin >> currentpos;
+                    std::cout << "정말 삭제할까요 ? 1번 삭제, 2번 뒤로가기"; std::cin >> check;
+                    if (check >= 2) break;
 
+                    if (!user.DeleteItem(checknum, currentpos)) {
+                        std::cout << "아이템 삭제 실패 !" << std::endl;
+                    }
+                }
                 std::cout << std::endl;
                 std::cout << std::endl;
             }

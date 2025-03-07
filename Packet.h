@@ -63,7 +63,7 @@ struct USER_LOGOUT_REQUEST_PACKET : PACKET_HEADER {
 
 };
 
-//  ---------------------------- WEB  ----------------------------
+//  ---------------------------- SESSION  ----------------------------
 
 const int MAX_INVEN_SIZE = 512;
 
@@ -72,7 +72,7 @@ struct USER_GAMESTART_REQUEST : PACKET_HEADER {
 };
 
 struct USER_GAMESTART_RESPONSE : PACKET_HEADER {
-	char webToken[MAX_JWT_TOKEN_LEN + 1];
+	char Token[MAX_JWT_TOKEN_LEN + 1];
 };
 
 struct USERINFO_REQUEST : PACKET_HEADER {
@@ -142,7 +142,6 @@ struct ADD_ITEM_RESPONSE : PACKET_HEADER {
 struct DEL_ITEM_REQUEST : PACKET_HEADER {
 	uint16_t itemType; // (Max 3)
 	uint16_t itemPosition; // (Max 50)
-	uint16_t itemCode; // (Max 5000)
 };
 
 struct DEL_ITEM_RESPONSE : PACKET_HEADER {
@@ -190,7 +189,6 @@ struct ADD_EQUIPMENT_RESPONSE : PACKET_HEADER {
 
 struct DEL_EQUIPMENT_REQUEST : PACKET_HEADER {
 	uint16_t itemPosition; // (Max 50)
-	uint16_t itemCode; // (Max 5000)
 };
 
 struct DEL_EQUIPMENT_RESPONSE : PACKET_HEADER {
@@ -199,12 +197,11 @@ struct DEL_EQUIPMENT_RESPONSE : PACKET_HEADER {
 
 struct ENH_EQUIPMENT_REQUEST : PACKET_HEADER {
 	uint16_t itemPosition; // (Max 50)
-	uint16_t Enhancement; // (Max 10)
-	uint16_t itemCode; // (Max 5000)
 };
 
 struct ENH_EQUIPMENT_RESPONSE : PACKET_HEADER {
 	bool isSuccess;
+	uint16_t Enhancement = 0;
 };
 
 struct MOV_EQUIPMENT_REQUEST : PACKET_HEADER {
@@ -285,7 +282,7 @@ struct RAID_RANKING_RESPONSE : PACKET_HEADER {
 	char reqScore[MAX_SCORE_SIZE + 1];
 };
 
-enum class WEBPACKET_ID : uint16_t {
+enum class SESSIONPACKET_ID : uint16_t {
 	USER_LOGIN_REQUEST = 1,
 	USER_LOGIN_RESPONSE = 2,
 	USER_GAMESTART_REQUEST = 3,
@@ -305,10 +302,6 @@ enum class PACKET_ID : uint16_t {
 	USER_CONNECT_REQUEST = 1, // 유저는 2번으로 요청 
 	USER_CONNECT_RESPONSE = 2,
 	USER_LOGOUT_REQUEST = 3, // 유저는 3번으로 요청 
-	IM_WEB_REQUEST = 4, // 유저는 1번으로 요청 
-	IM_WEB_RESPONSE = 5,
-	SYNCRONIZE_LEVEL_REQUEST = 6, // SERVER TO WEB SERVER
-	SYNCRONIZE_LOGOUT_REQUEST = 7, // SERVER TO WEB SERVER
 	USER_FULL_REQUEST = 9, // SERVER TO USER
 	WAITTING_NUMBER_REQUSET = 10, // SERVER TO USER
 
