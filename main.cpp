@@ -27,11 +27,37 @@ int main() {
     }
 
     bool onlineCheck = true;
-    bool inChannelCheck = true;
+    bool inChannelCheck = false;
 
     while (onlineCheck) { // 서버 이동 페이지
-        if (!user.MoveServer()) {
-            continue;
+        inChannelCheck = false;
+
+        bool tempServerBool = false; // 서버 인원 수를 한 번만 불러오기 위한 플래그 (서버 이동 페이지에 머무르는 동안 재요청 방지)
+
+        while (1) {
+            if (user.MoveServer(tempServerBool) == false) { // 서버 입장 실패. 다시 서버 이동 페이지
+                tempServerBool = true; 
+                continue;
+            }
+            else { // 서버 입장 성공
+                break;
+            }
+        }
+
+        bool tempChannelBool = false; // 채널 인원 수를 한 번만 불러오기 위한 플래그 (채널 이동 페이지에 머무르는 동안 재요청 방지)
+
+        while (1) {
+            if (user.SelectChannel(tempChannelBool) == 0) { // 채널 입장 실패. 다시 채널 이동 페이지
+                tempChannelBool = true;
+                continue;
+            }
+            else if (user.SelectChannel(tempChannelBool) == 10) { // 서버 선택 페이지로 돌아가기
+                break;
+            }
+            else { // 채널 입장 성공
+                inChannelCheck = true;
+                break;
+            }
         }
         
         while (inChannelCheck) {
@@ -208,6 +234,7 @@ int main() {
                 break;
             }
             case 6: {
+                user.ChannelSocketinitialization();
                 inChannelCheck = false;
             }
             case 7: {
