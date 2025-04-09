@@ -18,12 +18,7 @@ const uint16_t INVENTORY_SIZE = 11; // 10개면 +1해서 11개로 해두기
 class User {
 public:
     ~User() {
-        WorkRun = false;
-        if (workThread.joinable()) workThread.join();
-        std::this_thread::sleep_for(std::chrono::seconds(2));
-        CloseHandle(udpHandle);
         closesocket(userSkt);
-        closesocket(udpSocket);
         WSACleanup();
     }
 
@@ -33,7 +28,7 @@ public:
 
         sessionSkt = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         if (sessionSkt == INVALID_SOCKET) {
-            std::cout << "Server Socket Make Fail" << std::endl;
+            std::cout << "Session Socket Make Fail" << std::endl;
             return false;
         }
 
@@ -144,11 +139,6 @@ public:
             ptr3 += sizeof(MATERIALS);
         }
 
-        //if (mt.empty()) {
-        //    std::cout << "Get MATERIALS Fail" << std::endl;
-        //    return false;
-        //}
-
         std::cout << "Get MATERIALS Success" << std::endl;
 
         USER_GAMESTART_REQUEST ugReq;
@@ -180,6 +170,10 @@ public:
         if (k != 1) exit(0);
 
         userSkt = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (userSkt == INVALID_SOCKET) {
+            std::cout << "Server Socket Make Fail" << std::endl;
+            return false;
+        }
 
         ZeroMemory(&addr, sizeof(addr));
         addr.sin_family = AF_INET;
@@ -208,30 +202,117 @@ public:
 
         if (ucResPacket->isSuccess == false) return false;
 
-        std::cout << "Connect Success In Game Server" << std::endl;
+        gameServerSkt = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (gameServerSkt == INVALID_SOCKET) {
+            std::cout << "Game Server Socket Make Fail" << std::endl;
+            return false;
+        }
 
-        udpSocket = WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, NULL, 0, WSA_FLAG_OVERLAPPED);
+        channelSkt = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (channelSkt == INVALID_SOCKET) {
+            std::cout << "Channel Server Socket Make Fail" << std::endl;
+            return false;
+        }
+
+        std::cout << "Connect Success In Game Server" << std::endl;
+        std::cout << userId << " 게임 접속 성공 !" << std::endl;
+    }
+
+    bool MoveServer() {
+        SERVER_USER_COUNTS_REQUEST serverUserCountsReq;
+        serverUserCountsReq.PacketId = (UINT16)PACKET_ID::SERVER_USER_COUNTS_REQUEST;
+        serverUserCountsReq.PacketLength = sizeof(SERVER_USER_COUNTS_REQUEST);
+
+        send(userSkt, (char*)&serverUserCountsReq, sizeof(serverUserCountsReq), 0);
+        recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+
+        auto ucResPacket = reinterpret_cast<SERVER_USER_COUNTS_RESPONSE*>(recvBuffer);
+        char* ptr = recvBuffer + sizeof(PACKET_HEADER) + sizeof(uint16_t);
+
+        uint16_t tempC = 0;
+
+        for (int i = 0; i < ucResPacket->serverCount; i++) {
+            memcpy((char*)&tempC, ptr, sizeof(uint16_t));
+            std::cout << i + 1 << " 서버 유저 수 : " << tempC <<  std::endl;
+            ptr += sizeof(uint16_t);
+        }
+
+        std::cout << "이동할 서버를 선택해주세요" << std::endl;
+        std::cin >> tempC;
+
+        MOVE_SERVER_REQUEST movesServerReq;
+        movesServerReq.PacketId = (UINT16)PACKET_ID::MOVE_SERVER_REQUEST;
+        movesServerReq.PacketLength = sizeof(MOVE_SERVER_REQUEST);
+
+        if (tempC == 1) {
+            movesServerReq.serverNum = static_cast<uint16_t>(ChannelServerType::CH_01);
+        }
+        else if (tempC == 2) {
+            movesServerReq.serverNum = static_cast<uint16_t>(ChannelServerType::CH_02);
+        }
+
+        send(userSkt, (char*)&movesServerReq, sizeof(movesServerReq), 0);
+        recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+
+        auto msResPacket = reinterpret_cast<MOVE_SERVER_RESPONSE*>(recvBuffer);
+
+        if (msResPacket->port == 0) { // 서버 이동 실패
+            std::cout << "현재 해당 서버로 이동할 수 없습니다. 다른 서버를 이용해주세요" << std::endl;
+            return false;
+        }
+
+        std::string Token = msResPacket->serverToken;
+
+        SOCKADDR_IN addr;
+        ZeroMemory(&addr, sizeof(addr));
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(msResPacket->port);
+        inet_pton(AF_INET, msResPacket->ip, &addr.sin_addr.s_addr);
+
+        if (connect(sessionSkt, (SOCKADDR*)&addr, sizeof(addr))) {
+            std::cout << "현재 해당 서버로 이동할 수 없습니다. 다른 서버를 이용해주세요" << std::endl;
+            return false;
+        }
+
+        USER_CONNECT_CHANNEL_REQUEST_PACKET uccReq;
+        uccReq.PacketId = (UINT16)CHANNEL_ID::USER_CONNECT_CHANNEL_REQUEST;
+        uccReq.PacketLength = sizeof(USER_CONNECT_CHANNEL_REQUEST_PACKET);
+        strncpy_s(uccReq.userId, userId.c_str(), MAX_USER_ID_LEN);
+        strncpy_s(uccReq.userToken, Token.c_str(), MAX_JWT_TOKEN_LEN);
+
+        std::cout << "Connect Requset To Channel Server.." << std::endl;
+
+        send(userSkt, (char*)&uccReq, sizeof(uccReq), 0);
+        recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+
+        auto uccResPacket = reinterpret_cast<USER_CONNECT_CHANNEL_RESPONSE_PACKET*>(recvBuffer);
+
+        if (uccResPacket->isSuccess == false) {
+            std::cout << "현재 해당 서버로 이동할 수 없습니다. 다른 서버를 이용해주세요" << std::endl;
+            return false;
+        }
+
+        // 토큰까지 체크 완료 (서버 연결 성공)
+        currentServer = tempC;
+        return true;
+    }
+
+    bool makeUDPSocket() {
+        udpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+
         if (udpSocket == INVALID_SOCKET) {
             std::cout << "Udp Socket Make Fail Error : " << WSAGetLastError() << std::endl;
             return false;
         }
 
-        udpHandle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 1);
-        auto bIOCPHandle = CreateIoCompletionPort((HANDLE)udpSocket, udpHandle, (ULONG_PTR)0, 0);
-
         udpAddr.sin_family = AF_INET;
         udpAddr.sin_port = htons(SERVER_UDP_PORT);
-        inet_pton(AF_INET, SERVER_IP, &udpAddr.sin_addr);
+        udpAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+        bind(udpSocket, (sockaddr*)&udpAddr, sizeof(udpAddr));
 
         std::cout << "Udp Socket Make Success" << std::endl;
 
-        CreateUdpThread();
-
-        std::cout << userId << " 게임 접속 성공 !" << std::endl;
-    }
-
-    bool CreateUdpThread() {
-        workThread = std::thread([this]() {UdpWorkThread(); });
         return true;
     }
 
@@ -244,7 +325,7 @@ public:
 
     void AddExpFromMob(uint16_t mobNum_) {
         EXP_UP_REQUEST euReq;
-        euReq.PacketId = (UINT16)PACKET_ID::EXP_UP_REQUEST;
+        euReq.PacketId = (UINT16)CHANNEL_ID::EXP_UP_REQUEST;
         euReq.PacketLength = sizeof(EXP_UP_REQUEST);
         euReq.mobNum = mobNum_;
 
@@ -275,33 +356,6 @@ public:
         return { level, exp };
     }
 
-    void UdpWorkThread() {
-        std::cout << "Start Udp Work Thread" << std::endl;
-        LPOVERLAPPED lpOverlapped = NULL;
-        DWORD dwIoSize = 0;
-        bool gqSucces = TRUE;
-
-        while (WorkRun) {
-            gqSucces = GetQueuedCompletionStatus(
-                udpHandle,
-                &dwIoSize,
-                nullptr,
-                &lpOverlapped,
-                INFINITE
-            );
-
-            auto overlapped = (OverlappedUDP*)lpOverlapped;
-
-            if (overlapped->taskType == TaskType::UDP_RECV) { // 레이드 몹 hp 동기화 요청
-                auto hp = reinterpret_cast<unsigned int*>(overlapped->wsaBuf.buf);
-                std::cout << "Current Mob Hp : " << mobHp << std::endl;
-                mobHp.store(*hp);
-                delete[] overlapped->wsaBuf.buf;
-                delete overlapped;
-            }
-        }
-    }
-
     void GetInventory(uint16_t invenNum_) {
         if (invenNum_ == 1) {
             std::cout << "장비 인벤토리" << std::endl;
@@ -330,7 +384,7 @@ public:
     bool MoveItem(uint16_t invenNum_, uint16_t currentpos_, uint16_t movepos_) {
         if (invenNum_ == 1) { // 장비
             MOV_EQUIPMENT_REQUEST miReq;
-            miReq.PacketId = (UINT16)PACKET_ID::MOV_EQUIPMENT_REQUEST;
+            miReq.PacketId = (UINT16)CHANNEL_ID::MOV_EQUIPMENT_REQUEST;
             miReq.PacketLength = sizeof(MOV_EQUIPMENT_REQUEST);
 
             EQUIPMENT currentE = eq[currentpos_];
@@ -360,7 +414,7 @@ public:
         }
         else { // 소비 or 재료
             MOV_ITEM_REQUEST miReq;
-            miReq.PacketId = (UINT16)PACKET_ID::MOV_ITEM_REQUEST;
+            miReq.PacketId = (UINT16)CHANNEL_ID::MOV_ITEM_REQUEST;
             miReq.PacketLength = sizeof(MOV_ITEM_REQUEST);
 
             if (invenNum_ == 2) { // 소비
@@ -422,7 +476,7 @@ public:
 
     bool AddEquipment(uint16_t itemCode_, uint16_t enhancement_) {
         ADD_EQUIPMENT_REQUEST aeReq;
-        aeReq.PacketId = (UINT16)PACKET_ID::ADD_EQUIPMENT_REQUEST;
+        aeReq.PacketId = (UINT16)CHANNEL_ID::ADD_EQUIPMENT_REQUEST;
         aeReq.PacketLength = sizeof(ADD_EQUIPMENT_REQUEST);
 
         uint16_t addPosition = INVENTORY_SIZE + 1;
@@ -461,115 +515,115 @@ public:
     }
 
     bool AddItem(uint16_t invenNum_, uint16_t itemCode_, uint16_t count_) {
-            ADD_ITEM_REQUEST aiReq;
-            aiReq.PacketId = (UINT16)PACKET_ID::ADD_ITEM_REQUEST;
-            aiReq.PacketLength = sizeof(ADD_ITEM_REQUEST);
+        ADD_ITEM_REQUEST aiReq;
+        aiReq.PacketId = (UINT16)CHANNEL_ID::ADD_ITEM_REQUEST;
+        aiReq.PacketLength = sizeof(ADD_ITEM_REQUEST);
 
-            if (invenNum_ == 2) { // 소비
-                uint16_t addPosition = 0;
-                uint16_t addCount = count_;
+        if (invenNum_ == 2) { // 소비
+            uint16_t addPosition = 0;
+            uint16_t addCount = count_;
 
+            for (int i = 1; i < INVENTORY_SIZE; i++) {
+                if (cs[i].itemCode == itemCode_) {
+                    addPosition = i;
+                    addCount += cs[i].count;
+                    break;
+                }
+            }
+
+            if (count_ == addCount) {
                 for (int i = 1; i < INVENTORY_SIZE; i++) {
-                    if (cs[i].itemCode == itemCode_) {
+                    if (cs[i].itemCode == 0) {
                         addPosition = i;
-                        addCount += cs[i].count;
                         break;
                     }
                 }
-
-                if (count_ == addCount) {
-                    for (int i = 1; i < INVENTORY_SIZE; i++) {
-                        if (cs[i].itemCode == 0) {
-                            addPosition = i;
-                            break;
-                        }
-                    }
-                }
-
-                if (addPosition == 0) { // 넣을 공간 없으면 false 반환
-                    std::cout << "Consumables Full" << std::endl;
-                    return false;
-                }
-
-                aiReq.itemType = invenNum_ - 1;
-                aiReq.itemCode = itemCode_;
-                aiReq.itemPosition = addPosition;
-                aiReq.itemCount = addCount;
-
-                send(userSkt, (char*)&aiReq, sizeof(aiReq), 0);
-                recv(userSkt, recvBuffer, PACKET_SIZE, 0);
-
-                auto miResPacket = reinterpret_cast<ADD_ITEM_RESPONSE*>(recvBuffer);
-
-                if (!miResPacket->isSuccess) return false;
-
-                CONSUMABLES tempC;
-                tempC.itemCode = itemCode_;
-                tempC.position = addPosition;
-                tempC.count = addCount;
-
-                cs[addPosition] = tempC;
-
-                return true;
             }
-            else if (invenNum_ == 3) {
-                uint16_t addPosition = 0;
-                uint16_t addCount = count_;
 
+            if (addPosition == 0) { // 넣을 공간 없으면 false 반환
+                std::cout << "Consumables Full" << std::endl;
+                return false;
+            }
+
+            aiReq.itemType = invenNum_ - 1;
+            aiReq.itemCode = itemCode_;
+            aiReq.itemPosition = addPosition;
+            aiReq.itemCount = addCount;
+
+            send(userSkt, (char*)&aiReq, sizeof(aiReq), 0);
+            recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+
+            auto miResPacket = reinterpret_cast<ADD_ITEM_RESPONSE*>(recvBuffer);
+
+            if (!miResPacket->isSuccess) return false;
+
+            CONSUMABLES tempC;
+            tempC.itemCode = itemCode_;
+            tempC.position = addPosition;
+            tempC.count = addCount;
+
+            cs[addPosition] = tempC;
+
+            return true;
+        }
+        else if (invenNum_ == 3) {
+            uint16_t addPosition = 0;
+            uint16_t addCount = count_;
+
+            for (int i = 1; i < INVENTORY_SIZE; i++) {
+                if (mt[i].itemCode == itemCode_) {
+                    addPosition = i;
+                    addCount += mt[i].count;
+                    break;
+                }
+            }
+
+            if (count_ == addCount) {
                 for (int i = 1; i < INVENTORY_SIZE; i++) {
-                    if (mt[i].itemCode == itemCode_) {
+                    if (mt[i].itemCode == 0) {
                         addPosition = i;
-                        addCount += mt[i].count;
                         break;
                     }
                 }
-
-                if (count_ == addCount) {
-                    for (int i = 1; i < INVENTORY_SIZE; i++) {
-                        if (mt[i].itemCode == 0) {
-                            addPosition = i;
-                            break;
-                        }
-                    }
-                }
-
-                if (addPosition == 0) { // 넣을 공간 없으면 false 반환
-                    std::cout << "Materials Full" << std::endl;
-                    return false;
-                }
-
-                aiReq.itemType = invenNum_ - 1;
-                aiReq.itemCode = itemCode_;
-                aiReq.itemPosition = addPosition;
-                aiReq.itemCount = count_;
-
-                send(userSkt, (char*)&aiReq, sizeof(aiReq), 0);
-                recv(userSkt, recvBuffer, PACKET_SIZE, 0);
-
-                auto miResPacket = reinterpret_cast<ADD_ITEM_RESPONSE*>(recvBuffer);
-
-                if (!miResPacket->isSuccess) return false;
-
-                MATERIALS tempM;
-                tempM.itemCode = itemCode_;
-                tempM.position = addPosition;
-                tempM.count = addCount;
-
-                mt[addPosition] = tempM;
-
-                return true;
             }
+
+            if (addPosition == 0) { // 넣을 공간 없으면 false 반환
+                std::cout << "Materials Full" << std::endl;
+                return false;
+            }
+
+            aiReq.itemType = invenNum_ - 1;
+            aiReq.itemCode = itemCode_;
+            aiReq.itemPosition = addPosition;
+            aiReq.itemCount = count_;
+
+            send(userSkt, (char*)&aiReq, sizeof(aiReq), 0);
+            recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+
+            auto miResPacket = reinterpret_cast<ADD_ITEM_RESPONSE*>(recvBuffer);
+
+            if (!miResPacket->isSuccess) return false;
+
+            MATERIALS tempM;
+            tempM.itemCode = itemCode_;
+            tempM.position = addPosition;
+            tempM.count = addCount;
+
+            mt[addPosition] = tempM;
+
+            return true;
+        }
     }
 
     bool DeleteItem(uint16_t invenNum_, uint16_t pos_) {
         DEL_ITEM_REQUEST delReq;
-        delReq.PacketId = (UINT16)PACKET_ID::DEL_ITEM_REQUEST;
+        delReq.PacketId = (UINT16)CHANNEL_ID::DEL_ITEM_REQUEST;
         delReq.PacketLength = sizeof(DEL_ITEM_REQUEST);
         delReq.itemPosition = pos_;
 
         if (invenNum_ == 1) {
             DEL_EQUIPMENT_REQUEST delEReq;
-            delEReq.PacketId = (UINT16)PACKET_ID::DEL_EQUIPMENT_REQUEST;
+            delEReq.PacketId = (UINT16)CHANNEL_ID::DEL_EQUIPMENT_REQUEST;
             delEReq.PacketLength = sizeof(DEL_EQUIPMENT_REQUEST);
             delEReq.itemPosition = pos_;
 
@@ -619,7 +673,7 @@ public:
 
     bool EnhanceEquip(uint16_t pos_) { // Equipment Only
         ENH_EQUIPMENT_REQUEST enhReq;
-        enhReq.PacketId = (UINT16)PACKET_ID::ENH_EQUIPMENT_REQUEST;
+        enhReq.PacketId = (UINT16)CHANNEL_ID::ENH_EQUIPMENT_REQUEST;
         enhReq.PacketLength = sizeof(ENH_EQUIPMENT_REQUEST);
         enhReq.itemPosition = pos_;
 
@@ -639,10 +693,6 @@ public:
         std::cout << "+" << enhResPacket->Enhancement << "로 강화 성공" << std::endl;
 
         return true;
-    }
-
-    bool UserItem(uint16_t pos_, uint16_t count_) { // Consumables, Materials Only
-
     }
 
     void RaidStart() {
@@ -671,6 +721,11 @@ public:
         myNum = rrReqPacket->yourNum;
         mobHp = rrReqPacket->mobHp;
 
+        if (!makeUDPSocket()) { // UDP 소켓 생성 실패했을때
+            std::cout << "Udp Socket Make Fail" << std::endl;
+            return;
+        }
+
         RAID_TEAMINFO_REQUEST rtReq;
         rtReq.PacketId = (UINT16)PACKET_ID::RAID_TEAMINFO_REQUEST;
         rtReq.PacketLength = sizeof(RAID_TEAMINFO_REQUEST);
@@ -692,9 +747,6 @@ public:
 
         auto rsReqPacket = reinterpret_cast<RAID_START_REQUEST*>(recvBuffer);
 
-        unsigned int myScore = 0;
-        unsigned int teamScore = 0;
-
         std::cout << "Raid Start !" << std::endl;
         std::cout << "Mob Hp : " << mobHp << std::endl;
         std::cout << "My ID : " << userId << " / Level : " << level << std::endl;
@@ -702,51 +754,106 @@ public:
 
         rEndTime = rsReqPacket->endTime;
 
-        while (1) {
-            while (mobHp >= 0 || (std::chrono::steady_clock::now() < rEndTime)) {
-                std::cout << "Input Damage" << std::endl;
-                unsigned int damage;
-                std::cin >> damage;
+        syncRun = true;
+        inGameRun = true;
+        CreateSyncThread();
+        CreateInGameThread();
 
-                RAID_HIT_REQUEST rhReq;
-                rhReq.PacketId = (UINT16)PACKET_ID::RAID_HIT_REQUEST;
-                rhReq.PacketLength = sizeof(RAID_HIT_REQUEST);
-                rhReq.myNum = myNum;
-                rhReq.roomNum = roomNum;
-                rhReq.damage = damage;
+        while (inGameRun && syncRun) { std::this_thread::sleep_for(std::chrono::milliseconds(100)); }
+        std::this_thread::sleep_for(std::chrono::seconds(1));
 
-                send(userSkt, (char*)&rhReq, sizeof(rhReq), 0);
-                recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+        if (inGameThread.joinable()) inGameThread.join();
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        std::cout << "InGame Thread End" << std::endl;
 
-                auto rhResPacket = reinterpret_cast<RAID_HIT_RESPONSE*>(recvBuffer);
+        if (syncThread.joinable()) syncThread.join();
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        std::cout << "Sync Thread End" << std::endl;
+    }
 
-                if (rhResPacket->currentMobHp <= 0) { // mob dead
-                    if (rhResPacket->yourScore != 0) {
-                        std::cout << "My Socre : " << rhResPacket->yourScore << std::endl;
-                    }
-                    std::cout << "Game End Waitting..." << std::endl;
+    bool CreateSyncThread() {
+        syncThread = std::thread([this]() {SyncThread(); });
+        std::cout << "SyncThread Start" << std::endl;
+        return true;
+    }
 
-                    recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+    bool CreateInGameThread() {
+        inGameThread = std::thread([this]() {InGameThread(); });
+        std::cout << "InGameThread Start" << std::endl;
+        return true;
+    }
 
-                    auto reReq = reinterpret_cast<RAID_END_REQUEST*>(recvBuffer);
+    void SyncThread() {
+        sockaddr_in serverAddr = {};
 
-                    std::cout << "Raid End. Your Score : " << reReq->userScore << std::endl;
-                    std::cout << "Raid End. Team Score : " << reReq->teamScore << std::endl;
-                    std::cout << "Raid End." << std::endl;
-                    break;
-                }
-                else {
-                    if (mobHp.load() > rhResPacket->currentMobHp) mobHp.store(rhResPacket->currentMobHp);
-                    myScore = rhResPacket->yourScore;
+        while (syncRun) {
+            int serverAddrSize = sizeof(serverAddr);
+            int received = recvfrom(udpSocket, recvUDPBuffer, sizeof(recvUDPBuffer), 0,
+                (sockaddr*)&serverAddr, &serverAddrSize);
+            if (received == SOCKET_ERROR)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+            std::cout << "데이터 들어옴" << std::endl;
+            if (received == sizeof(unsigned int) && syncRun) {
+                unsigned int mobHp_ = *(unsigned int*)recvUDPBuffer;
+                mobHp.store(mobHp_);
+                std::cout << "Mob Hp : " << mobHp_ << std::endl;
+            }
+        }
+    }
+
+    void InGameThread() {
+        unsigned int myScore = 0;
+        unsigned int teamScore = 0;
+
+        while (mobHp >= 0 || (std::chrono::steady_clock::now() < rEndTime)) {
+            std::cout << "Input Damage" << std::endl;
+            unsigned int damage;
+            std::cin >> damage;
+
+            RAID_HIT_REQUEST rhReq;
+            rhReq.PacketId = (UINT16)PACKET_ID::RAID_HIT_REQUEST;
+            rhReq.PacketLength = sizeof(RAID_HIT_REQUEST);
+            rhReq.myNum = myNum;
+            rhReq.roomNum = roomNum;
+            rhReq.damage = damage;
+
+            send(userSkt, (char*)&rhReq, sizeof(rhReq), 0);
+            recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+
+            auto rhResPacket = reinterpret_cast<RAID_HIT_RESPONSE*>(recvBuffer);
+
+            if (rhResPacket->currentMobHp <= 0) { // mob dead
+                if (rhResPacket->yourScore != 0) {
                     std::cout << "My Socre : " << rhResPacket->yourScore << std::endl;
                 }
+                std::cout << "Game End Waitting..." << std::endl;
+
+                recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+
+                auto reReq = reinterpret_cast<RAID_END_REQUEST*>(recvBuffer);
+
+                std::cout << "Raid End. Your Score : " << reReq->userScore << std::endl;
+                std::cout << "Raid End. Team Score : " << reReq->teamScore << std::endl;
+                std::cout << "Raid End." << std::endl;
+                break;
             }
-            break;
+            else {
+                if (mobHp.load() > rhResPacket->currentMobHp) mobHp.store(rhResPacket->currentMobHp);
+                myScore = rhResPacket->yourScore;
+                std::cout << "My Socre : " << rhResPacket->yourScore << std::endl;
+            }
         }
+
         mobHp = 0;
         timer = 0;
         roomNum = 0;
         myNum = 0;
+
+        inGameRun = false;
+        syncRun = false;
+        closesocket(udpSocket);
     }
 
     bool GetRaidScore(uint16_t startNum_) { // 마지막 유저 스코어면 false 반환. 그 뒤 유저 없으니까 체크 x
@@ -802,41 +909,37 @@ public:
         return true;
     }
 
-    void End() {
-        char recvBuffer[PACKET_SIZE];
-        memset(recvBuffer, 0, PACKET_SIZE);
-
-        USER_LOGOUT_REQUEST_PACKET ulReq;
-        ulReq.PacketId = (UINT16)PACKET_ID::USER_LOGOUT_REQUEST;
-        ulReq.PacketLength = sizeof(USER_LOGOUT_REQUEST_PACKET);
-
-        send(userSkt, (char*)&ulReq, sizeof(ulReq), 0);
-    }
-
 private:
-    bool WorkRun = false;
+    std::atomic<bool> syncRun = false;
+    std::atomic<bool> inGameRun = false;
     std::atomic<uint16_t> level;
     std::atomic<unsigned int> exp;
     unsigned int raidScore;
+    char recvUDPBuffer[sizeof(unsigned int)];
 
     // Raid
     std::atomic<int> mobHp;
     uint16_t timer;
     uint16_t roomNum;
     uint16_t myNum;
+    uint16_t currentServer = 0;
+    uint16_t currentChannel = 0;
 
-    SOCKET sessionSkt;
     SOCKET userSkt;
+    SOCKET sessionSkt;
+    SOCKET gameServerSkt;
+    SOCKET channelSkt;
     SOCKET udpSocket;
-    HANDLE udpHandle;
-    std::thread workThread;
-
-    sockaddr_in udpAddr;
-    std::string userId = "quokka";
 
     std::chrono::time_point<std::chrono::steady_clock> rEndTime;
 
-    std::vector<EQUIPMENT> eq{INVENTORY_SIZE};
+    std::thread syncThread;
+    std::thread inGameThread;
+    sockaddr_in udpAddr;
+
+    std::string userId = "quokka";
+
+    std::vector<EQUIPMENT> eq{ INVENTORY_SIZE };
     std::vector<CONSUMABLES> cs{ INVENTORY_SIZE };
     std::vector<MATERIALS> mt{ INVENTORY_SIZE };
 
