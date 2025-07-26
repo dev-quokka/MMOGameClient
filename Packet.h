@@ -6,14 +6,26 @@
 #include <string>
 #include <vector>
 #include <chrono>
+#include <iostream>
+#include <unordered_map>
+
+inline const std::unordered_map<uint16_t, std::string> PassCurrencyTypeMap = {
+	 {0, "free"},
+	 {1, "cash1"},
+};
 
 const uint16_t RANKING_USER_COUNT = 3; // 몇명씩 유저 랭킹 정보 가져올건지
 
-const int MAX_IP_LEN = 32;
-const int MAX_SERVER_USERS = 128; // 서버 유저 수 전달 패킷
-const int MAX_USER_ID_LEN = 32;
-const int MAX_JWT_TOKEN_LEN = 256;
-const int MAX_SCORE_SIZE = 256;
+const uint16_t MAX_IP_LEN = 32;
+const uint16_t MAX_SERVER_USERS = 128; // 서버 유저 수 전달 패킷
+const uint16_t MAX_USER_ID_LEN = 32;
+const uint16_t MAX_JWT_TOKEN_LEN = 256;
+const uint16_t MAX_SCORE_SIZE = 256;
+
+constexpr uint16_t MAX_ITEM_ID_LEN = 32;
+constexpr uint16_t MAX_PASS_ID_LEN = 32;
+constexpr uint16_t MAX_PASS_SIZE = 512;
+constexpr uint16_t MAX_INVEN_SIZE = 512;
 
 struct PACKET_HEADER
 {
@@ -21,10 +33,103 @@ struct PACKET_HEADER
 	uint16_t PacketId;
 };
 
+struct PASSINFO_CLIENT {
+	std::string eventStart;
+	std::string eventEnd;
+	uint16_t passMaxLevel = 0;
+};
+
+struct PASSDATAFORSEND {
+	char itemName[MAX_ITEM_ID_LEN + 1];
+	char passId[MAX_PASS_ID_LEN + 1];
+	uint16_t itemCode = 0;
+	uint16_t passLevel = 0;
+	uint16_t itemCount = 1; // 아이템 개수
+	uint16_t daysOrCount = 0;
+	uint16_t itemType;
+	uint16_t passCurrencyType;
+};
+
+struct PASSDATA_CLIENT {
+	std::string itemName;
+	uint16_t itemCode = 0;
+	uint16_t passLevel = 0;
+	uint16_t itemCount = 1; // 아이템 개수
+	uint16_t daysOrCount = 0;
+	uint16_t itemType;
+	uint16_t passCurrencyType;
+	bool getCheck = 0; // 획득 여부 체크
+
+	void SetData(PASSDATAFORSEND& pdf) {
+		itemName = (std::string)pdf.itemName;
+		itemCode = pdf.itemCode;
+		itemCount = pdf.itemCount;
+		daysOrCount = pdf.daysOrCount;
+		itemType = pdf.itemType;
+		passCurrencyType = pdf.passCurrencyType;
+	}
+
+	void printPassData() {
+		std::cout << "패스 레벨 :  " << itemName << '\n';
+		std::cout << "아이템 이름 : " << itemName << '\n';
+		std::cout << "아이템 개수 : " << itemCount << '\n';
+		std::cout << "아이템  : " << daysOrCount << '\n';
+
+		switch (itemType) {
+		case 0: { // 장비
+			std::cout << "아이템 사용 기한 : " << daysOrCount << "일" << '\n';
+		}
+			  break;
+		case 1: { // 소비
+			std::cout << "아이템 획득 개수 :  " << daysOrCount << "개" << '\n';
+		}
+			  break;
+		case 2: { // 재료
+			std::cout << "아이템 획득 개수 : " << daysOrCount << "개" << '\n';
+		}
+			  break;
+		}
+
+		switch (passCurrencyType) {
+		case 0: {
+			std::cout << "결제 유형 : 무료 " << '\n';
+		}
+			  break;
+		case 1: {
+			std::cout << "결제 유형 : 유료1 " << '\n';
+		}
+			  break;
+		}
+
+		if(getCheck) std::cout << "획득한 아이템" << '\n';
+		else  std::cout << "미획득 아이템" << '\n';
+	}
+};
+
+struct ShopItemForSend {
+	char itemName[MAX_ITEM_ID_LEN + 1];
+	uint32_t itemPrice = 0;
+	uint16_t itemCode = 0;
+	uint16_t itemCount = 1; // 아이템 개수
+	uint16_t daysOrCount = 0; // [장비: 기간, 소비: 개수 묶음] 
+	uint16_t itemType;
+	uint16_t currencyType; // 결제수단
+
+	// 장비 아이템 필요 변수
+	uint16_t attackPower = 0;
+
+	// 소비 아이템 필요 변수
+
+	// 재료 아이템 필요 변수
+};
+
 struct USERINFO {
-	uint16_t level = 0;
-	unsigned int exp = 0;
 	unsigned int raidScore = 0;
+	unsigned int exp = 0;
+	uint32_t gold = 0;
+	uint32_t cash = 0;
+	uint32_t mileage = 0;
+	uint16_t level = 0;
 };
 
 struct EQUIPMENT {
@@ -45,10 +150,39 @@ struct MATERIALS {
 	uint16_t count = 0;
 };
 
+struct PASSREWARDNFO {
+	char passId[MAX_PASS_ID_LEN + 1];
+	uint64_t passReqwardBits = 0;
+	uint16_t passCurrencyType = 254;
+};
+
+struct PASSREWARDNFO_CLIENT {
+	uint64_t passReqwardBits = 0;
+	uint16_t passCurrencyType = 254;
+};
+
+struct RAID_USERINFO{
+	std::string userId  = "";
+	uint16_t userLevel = 0;
+	uint16_t userScore = 0;
+};
+
 struct RANKING {
 	uint16_t score = 0;
 	char userId[MAX_USER_ID_LEN + 1] = {};
 };
+
+//  ---------------------------- TEST  ----------------------------
+
+struct CASH_CHARGE_COMPLETE_REQUEST : PACKET_HEADER {
+	uint32_t chargedCash = 0;
+};
+
+struct CASH_CHARGE_COMPLETE_RESPONSE : PACKET_HEADER {
+	uint32_t chargedCash = 0;
+	bool isSuccess;
+};
+
 
 //  ---------------------------- SYSTEM  ----------------------------
 
@@ -68,6 +202,22 @@ struct SERVER_USER_COUNTS_REQUEST : PACKET_HEADER {
 struct SERVER_USER_COUNTS_RESPONSE : PACKET_HEADER {
 	uint16_t serverCount;
 	char serverUserCnt[MAX_SERVER_USERS + 1];
+};
+
+struct SHOP_DATA_REQUEST : PACKET_HEADER {
+
+};
+
+struct SHOP_DATA_RESPONSE : PACKET_HEADER {
+	uint16_t shopItemSize;
+};
+
+struct PASS_DATA_REQUEST : PACKET_HEADER {
+
+};
+
+struct PASS_DATA_RESPONSE : PACKET_HEADER {
+	uint16_t passDataSize;
 };
 
 struct MOVE_SERVER_REQUEST : PACKET_HEADER {
@@ -106,9 +256,20 @@ struct MOVE_CHANNEL_RESPONSE : PACKET_HEADER {
 	bool isSuccess;
 };
 
-//  ---------------------------- SESSION  ----------------------------
+struct SHOP_BUY_ITEM_REQUEST : PACKET_HEADER {
+	uint16_t itemCode = 0;
+	uint16_t daysOrCount = 0; // [장비: 유저가 원하는 아이템의 사용 기간, 소비: 유저가 원하는 아이템 개수 묶음] 
+	uint16_t itemType; // 0: 장비, 1: 소비, 2: 재료
+};
 
-const int MAX_INVEN_SIZE = 512;
+struct SHOP_BUY_ITEM_RESPONSE : PACKET_HEADER {
+	uint32_t remainMoney;
+	uint16_t passCurrencyType;
+	bool isSuccess;
+};
+
+
+//  ---------------------------- LOGIN  ----------------------------
 
 struct USER_GAMESTART_REQUEST : PACKET_HEADER {
 	char userId[MAX_USER_ID_LEN + 1];
@@ -153,6 +314,14 @@ struct MATERIALS_RESPONSE : PACKET_HEADER {
 	char Materials[MAX_INVEN_SIZE + 1];
 };
 
+struct PASSREWARDINFO_REQUEST : PACKET_HEADER {
+
+};
+
+struct PASSREWARDINFO_RESPONSE : PACKET_HEADER {
+	uint16_t passCount = 0;
+	char PassRewords[MAX_PASS_SIZE + 1];
+};
 
 
 //  ---------------------------- USER STATUS  ----------------------------
@@ -303,12 +472,13 @@ struct USER_CONNECT_GAME_RESPONSE : PACKET_HEADER {
 };
 
 struct RAID_TEAMINFO_REQUEST : PACKET_HEADER {
-	sockaddr_in userAddr; // 유저가 만든 udp 소켓의 sockaddr_in 전달
+	sockaddr_in userAddr;
 };
 
 struct RAID_TEAMINFO_RESPONSE : PACKET_HEADER {
 	char teamId[MAX_USER_ID_LEN + 1];
-	uint16_t teamLevel;
+	uint16_t userLevel;
+	uint16_t userRaidServerObjNum;
 };
 
 struct RAID_START : PACKET_HEADER {
@@ -326,14 +496,15 @@ struct RAID_HIT_RESPONSE : PACKET_HEADER {
 	unsigned int currentMobHp;
 };
 
-struct RAID_END_REQUEST : PACKET_HEADER { // Server TO User
+struct RAID_END : PACKET_HEADER {
+
+};
+
+struct SEND_RAID_SCORE : PACKET_HEADER {
 	unsigned int userScore;
-	unsigned int teamScore;
+	uint16_t userRaidServerObjNum;
 };
 
-struct RAID_END_RESPONSE : PACKET_HEADER { // User to Server (If Server Get This Packet, Return Room Number)
-
-};
 
 enum class PACKET_ID : uint16_t {
 	//  ---------------------------- CENTER (1~)  ----------------------------
@@ -356,6 +527,29 @@ enum class PACKET_ID : uint16_t {
 	RAID_RANKING_REQUEST = 55,
 	RAID_RANKING_RESPONSE = 56,
 
+	// SHOP (101~ )
+	SHOP_DATA_REQUEST = 101,
+	SHOP_DATA_RESPONSE = 102,
+	SHOP_BUY_ITEM_REQUEST = 103,
+	SHOP_BUY_ITEM_RESPONSE = 104,
+
+	// PASSITEM (301~ )
+	PASS_DATA_REQUEST = 301,
+	PASS_DATA_RESPONSE = 302,
+	GET_PASS_ITEM_REQUEST = 303,
+	GET_PASS_ITEM_RESPONSE = 304,
+
+	PASS_EXP_UP_REQUEST = 310,
+	PASS_EXP_UP_RESPONSE = 311,
+
+
+	// ======================= CASH SERVER (501~ ) =======================	
+
+	// 유저 캐시 충전 완료 요청 테스트용 (511,512)
+	CASH_CHARGE_COMPLETE_REQUEST = 511,
+	CASH_CHARGE_COMPLETE_RESPONSE = 512,
+
+
 	//  ---------------------------- SESSION (801~)  ----------------------------
 	
 	// USER LOGIN (811~)
@@ -371,6 +565,8 @@ enum class PACKET_ID : uint16_t {
 	CONSUMABLES_RESPONSE = 820,
 	MATERIALS_REQUEST = 821,
 	MATERIALS_RESPONSE = 822,
+	PASSREWARDINFO_REQUEST = 823,
+	PASSREWARDINFO_RESPONSE = 824,
 
 	//  ---------------------------- CHANNEL (1501~)  ----------------------------
 
@@ -410,8 +606,8 @@ enum class PACKET_ID : uint16_t {
 
 	//  ---------------------------- RAID(8001~)  ----------------------------
 
-	USER_CONNECT_GAME_REQUEST = 8003,
-	USER_CONNECT_GAME_RESPONSE = 8004,
+	USER_CONNECT_GAME_REQUEST = 8005,
+	USER_CONNECT_GAME_RESPONSE = 8006,
 
 	RAID_TEAMINFO_REQUEST = 8055,
 	RAID_TEAMINFO_RESPONSE = 8056,
@@ -419,5 +615,5 @@ enum class PACKET_ID : uint16_t {
 	RAID_HIT_REQUEST = 8058,
 	RAID_HIT_RESPONSE = 8059,
 
-	RAID_END_REQUEST = 8101,
+	RAID_END = 8101,
 };
