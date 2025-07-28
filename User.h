@@ -32,8 +32,8 @@ public:
         ccReq.PacketLength = sizeof(CASH_CHARGE_COMPLETE_REQUEST);
         ccReq.chargedCash = cashCharge_;
 
-        send(sessionSkt, (char*)&ccReq, sizeof(ccReq), 0);
-        recv(sessionSkt, recvBuffer, PACKET_SIZE, 0);
+        send(userSkt, (char*)&ccReq, sizeof(ccReq), 0);
+        recv(userSkt, recvBuffer, PACKET_SIZE, 0);
 
         auto* mtPacket = reinterpret_cast<CASH_CHARGE_COMPLETE_RESPONSE*>(recvBuffer);
     
@@ -191,6 +191,33 @@ public:
         std::cout << "Get MATERIALS Success" << std::endl;
 
 
+        // ============================ 이벤트 패스 정보 요청 ============================
+
+        PASSINFO_REQUEST piReq;
+        piReq.PacketId = (UINT16)PACKET_ID::PASSINFO_REQUEST;
+        piReq.PacketLength = sizeof(PASSINFO_REQUEST);
+
+        send(sessionSkt, (char*)&piReq, sizeof(piReq), 0);
+        recv(sessionSkt, recvBuffer, sizeof(PASSINFO_RESPONSE), 0);
+
+        auto piPacket = reinterpret_cast<PASSINFO_RESPONSE*>(recvBuffer);
+        uint16_t tempPassInfoCount = piPacket->passCount;
+
+        recv(sessionSkt, recvBuffer + sizeof(PASSINFO_RESPONSE), PACKET_SIZE, 0);
+
+        USERPASSINFO* tempPassInfos = reinterpret_cast<USERPASSINFO*>(recvBuffer + sizeof(PASSINFO_RESPONSE));
+
+        for (int i = 0; i < tempPassInfoCount; i++) {
+            USERPASSINFO tempPi = tempPassInfos[i];
+
+            if (tempPi.passCurrencyType == 254) return false; // 잘못된 데이터
+
+            passInfoMap[tempPi.passInfo.passId] = { tempPi.passInfo, tempPi.passLevel, tempPi.passExp, tempPi.passCurrencyType };
+        }
+
+        std::cout << "Get PASSINFO Success" << std::endl;
+
+
         // ============================ 패스 보상 획득 여부 요청 ============================
 
         PASSREWARDINFO_REQUEST priReq;
@@ -198,21 +225,23 @@ public:
         priReq.PacketLength = sizeof(PASSREWARDINFO_REQUEST);
 
         send(sessionSkt, (char*)&priReq, sizeof(priReq), 0);
-        recv(sessionSkt, recvBuffer, PACKET_SIZE, 0); // 소비 정보
+        recv(sessionSkt, recvBuffer, sizeof(PASSREWARDINFO_RESPONSE), 0);
 
         auto priPacket = reinterpret_cast<PASSREWARDINFO_RESPONSE*>(recvBuffer);
-        char* ptr4 = recvBuffer + sizeof(PACKET_HEADER) + sizeof(uint16_t);
+        uint16_t tempPassRewordCount = priPacket->passRewordCount;
+
+        recv(sessionSkt, recvBuffer + sizeof(PASSREWARDINFO_RESPONSE), PACKET_SIZE, 0);
+
+        PASSREWARDNFO* tempPassRewordInfos = reinterpret_cast<PASSREWARDNFO*>(recvBuffer + sizeof(PASSREWARDINFO_RESPONSE));
 
         std::unordered_map<std::string, PASSREWARDNFO_CLIENT> passRewardInfoMap; // 임시 패스 리워드 비트 저장 맵
 
-        for (int i = 0; i < priPacket->passCount; i++) {
-            PASSREWARDNFO tempPri;
-            memcpy((char*)&tempPri, ptr4, sizeof(PASSREWARDNFO));
+        for (int i = 0; i < tempPassRewordCount; i++) {
+            PASSREWARDNFO tempPri = tempPassRewordInfos[i];
 
             if (tempPri.passCurrencyType == 254) return false; // 잘못된 데이터
 
             passRewardInfoMap[tempPri.passId] = { tempPri.passReqwardBits, tempPri.passCurrencyType };
-            ptr4 += sizeof(PASSREWARDNFO);
         }
 
         std::cout << "Get PASSREWARDNFO Success" << std::endl;
@@ -266,111 +295,6 @@ public:
             return false;
         }
 
-
-        // ============================ 상점 데이터 요청 ============================
-
-        SHOP_DATA_REQUEST shReq;
-        shReq.PacketId = (UINT16)PACKET_ID::SHOP_DATA_REQUEST;
-        shReq.PacketLength = sizeof(SHOP_DATA_REQUEST);
-
-        send(userSkt, (char*)&shReq, sizeof(shReq), 0);
-
-        int tempHeader = 0;
-        while (tempHeader < sizeof(PACKET_HEADER)) {
-            int tempShopHeaderLength = recv(userSkt, recvBuffer + tempHeader, sizeof(PACKET_HEADER) - tempHeader, 0);
-            if (tempShopHeaderLength <= 0) return false;
-
-            tempHeader += tempShopHeaderLength;
-        }
-
-        auto tempHeaderSize = reinterpret_cast<PACKET_HEADER*>(recvBuffer);
-        uint16_t tempHeaderLength = tempHeaderSize->PacketLength;
-
-        int recvSize = tempHeaderLength - sizeof(PACKET_HEADER);
-        int receivedSize = 0;
-
-        while (receivedSize < recvSize) {
-            int tempShopDataLength = recv(userSkt, recvBuffer + sizeof(PACKET_HEADER) + receivedSize, recvSize - receivedSize, 0);
-            if (tempShopDataLength <= 0) return false;
-
-            receivedSize += tempShopDataLength;
-        }
-
-        auto sdRes = reinterpret_cast<SHOP_DATA_RESPONSE*>(recvBuffer);
-        uint16_t tempShopCount = sdRes->shopItemSize;
-
-        ShopItemForSend* tempShopItems = reinterpret_cast<ShopItemForSend*>(recvBuffer + sizeof(SHOP_DATA_RESPONSE));
-
-        shopItems.resize(tempShopCount);
-        for (int i = 0; i < tempShopCount; i++) {
-            shopItems[i] = tempShopItems[i];
-        }
-
-        std::cout << "상점 데이터 수신 성공" << '\n';
-
-
-        // ============================ 패스 데이터 요청 ============================
-
-        PASS_DATA_REQUEST passReq;
-        passReq.PacketId = (uint16_t)PACKET_ID::PASS_DATA_REQUEST;
-        passReq.PacketLength = sizeof(PASS_DATA_REQUEST);
-
-        send(userSkt, (char*)&passReq, sizeof(passReq), 0);
-
-        int tempPassHeaderCheck = 0;
-        while (tempPassHeaderCheck < sizeof(PACKET_HEADER)) {
-            int tempPassHeaderLength = recv(userSkt, recvBuffer + tempPassHeaderCheck, sizeof(PACKET_HEADER) - tempPassHeaderCheck, 0);
-            if (tempPassHeaderLength <= 0) return false;
-
-            tempPassHeaderCheck += tempPassHeaderLength;
-        }
-
-        auto tempPassHeaderSize = reinterpret_cast<PACKET_HEADER*>(recvBuffer);
-        uint16_t totalPacketLength = tempPassHeaderSize->PacketLength;
-
-        int passRecvSize = totalPacketLength - sizeof(PACKET_HEADER);
-        int passReceived = 0;
-
-        while (passReceived < passRecvSize) {
-            int tempPassDataLength = recv(userSkt, recvBuffer + sizeof(PACKET_HEADER) + passReceived, passRecvSize - passReceived, 0);
-            if (tempPassDataLength <= 0) return false;
-
-            passReceived += tempPassDataLength;
-        }
-
-        auto pdRes = reinterpret_cast<PASS_DATA_RESPONSE*>(recvBuffer);
-        uint16_t passDataCount = pdRes->passDataSize;
-
-        PASSDATAFORSEND* dataArray = reinterpret_cast<PASSDATAFORSEND*>(recvBuffer + sizeof(PASS_DATA_RESPONSE));
-
-        for (int i = 0; i < passDataCount; i++) {
-            std::string passId = (std::string)dataArray[i].passId;
-
-            PASSDATA_CLIENT pc;
-            pc.SetData(dataArray[i]);
-
-            auto it = passRewardInfoMap.find(passId);
-            if (it != passRewardInfoMap.end()) {
-                PASSREWARDNFO_CLIENT& rewardInfo = it->second;
-
-                if (rewardInfo.passCurrencyType == pc.passCurrencyType) {
-                    uint16_t level = dataArray[i].passLevel;
-
-                    if (level < 64) {
-                        pc.getCheck = (rewardInfo.passReqwardBits >> level) != 0; // 코드 잘 들어가는지 체크
-                    }
-                    else { // 잘못된 데이터
-                        return false;
-                    }
-                }
-            }
-
-            passInfoMap[passId].emplace_back(pc);
-        }
-
-        std::cout << "패스 데이터 수신 성공" << '\n';
-
-
         USER_CONNECT_REQUEST_PACKET ucReq;
         ucReq.PacketId = (UINT16)PACKET_ID::USER_CONNECT_REQUEST;
         ucReq.PacketLength = sizeof(USER_CONNECT_REQUEST_PACKET);
@@ -399,6 +323,74 @@ public:
         }
 
         std::cout << "Connect Success In Game Server" << std::endl;
+
+
+        // ============================ 상점 데이터 요청 ============================
+
+        SHOP_DATA_REQUEST shReq;
+        shReq.PacketId = (UINT16)PACKET_ID::SHOP_DATA_REQUEST;
+        shReq.PacketLength = sizeof(SHOP_DATA_REQUEST);
+
+        send(userSkt, (char*)&shReq, sizeof(shReq), 0);
+        recv(userSkt, recvBuffer, sizeof(SHOP_DATA_RESPONSE), 0);
+
+        auto sdRes = reinterpret_cast<SHOP_DATA_RESPONSE*>(recvBuffer);
+        uint16_t tempShopCount = sdRes->shopItemSize;
+
+        recv(userSkt, recvBuffer + sizeof(SHOP_DATA_RESPONSE), PACKET_SIZE, 0);
+
+        ShopItemForSend* tempShopItems = reinterpret_cast<ShopItemForSend*>(recvBuffer + sizeof(SHOP_DATA_RESPONSE));
+
+        shopItems.resize(tempShopCount);
+        for (int i = 0; i < tempShopCount; i++) {
+            shopItems[i] = tempShopItems[i];
+        }
+
+        std::cout << "상점 데이터 수신 성공" << '\n';
+
+
+        // ============================ 패스 데이터 요청 ============================
+
+        PASS_DATA_REQUEST passReq;
+        passReq.PacketId = (uint16_t)PACKET_ID::PASS_DATA_REQUEST;
+        passReq.PacketLength = sizeof(PASS_DATA_REQUEST);
+
+        send(userSkt, (char*)&passReq, sizeof(passReq), 0);
+        recv(userSkt, recvBuffer, sizeof(PASS_DATA_RESPONSE), 0);
+
+        auto pdRes = reinterpret_cast<PASS_DATA_RESPONSE*>(recvBuffer);
+        uint16_t passDataCount = pdRes->passDataSize;
+
+        recv(userSkt, recvBuffer + sizeof(PASS_DATA_RESPONSE), PACKET_SIZE, 0);
+
+        PassItemForSend* dataArray = reinterpret_cast<PassItemForSend*>(recvBuffer + sizeof(PASS_DATA_RESPONSE));
+
+        for (int i = 0; i < passDataCount; i++) {
+            std::string passId = (std::string)dataArray[i].passId;
+
+            PassItem_Client pc;
+            pc.SetData(dataArray[i]);
+
+            auto it = passRewardInfoMap.find(passId);
+            if (it != passRewardInfoMap.end()) {
+                PASSREWARDNFO_CLIENT& rewardInfo = it->second;
+
+                if (rewardInfo.passCurrencyType == pc.passCurrencyType) {
+                    uint16_t level = dataArray[i].passLevel;
+
+                    if (level < 64) {
+                        pc.getCheck = (rewardInfo.passReqwardBits >> level) != 0; // 코드 잘 들어가는지 체크
+                    }
+                    else { // 잘못된 데이터
+                        return false;
+                    }
+                }
+            }
+
+            passDataMap[passId][{pc.passLevel, pc.passCurrencyType}] = pc;
+        }
+
+        std::cout << "패스 데이터 수신 성공" << '\n';
         std::cout << userId << " 게임 접속 성공 !" << std::endl;
     }
 
@@ -1410,7 +1402,7 @@ public:
         std::cout << sbRes->remainMoney << std::endl;
 
         if (sbRes->isSuccess) {
-            switch (sbRes->passCurrencyType) {
+            switch (sbRes->currencyType) {
             case 0: { // 골드
                 userGold = sbRes->remainMoney;
                 break;
@@ -1425,22 +1417,63 @@ public:
             }
             }
             std::cout << "구매 성공" << '\n';
+            std::this_thread::sleep_for(std::chrono::milliseconds(500)); // 구매 후 재 구매 제한 시간 설정
         }
         else std::cout << "구매 실패" << '\n';
     }
 
     void GetPassInfo() {
         for (auto& m : passInfoMap) {
-            std::cout << m.first << " 패스 정보" << '\n';
+            std::cout << "패스 ID : " << m.first << "/ 레벨 : " << m.second.passLevel << "/ 경험치 : " << m.second.passExp << '\n';
+            std::cout << "이벤트 기간 : " << m.second.passInfo.eventStart << " ~ " << m.second.passInfo.eventEnd << '\n';
 
-            for (auto& k : m.second) {
-                k.printPassData();
+            for (auto& k : passDataMap[m.first]) {
+                k.second.PrintPassData();
             }
+            std::cout << '\n';
         }
     }
 
     void GetPassItem(std::string passId_, uint16_t passLevel_, uint16_t passCurrenyType_) {
+
+        GET_PASS_ITEM_REQUEST gpReq;
+        gpReq.PacketId = (UINT16)PACKET_ID::GET_PASS_ITEM_REQUEST;
+        gpReq.PacketLength = sizeof(GET_PASS_ITEM_REQUEST);
+        strncpy_s(gpReq.passId, passId_.c_str(), MAX_PASS_ID_LEN + 1);
+        gpReq.passLevel = passLevel_;
+        gpReq.passCurrencyType = passCurrenyType_;
+
+        send(userSkt, (char*)&gpReq, sizeof(gpReq), 0);
+        recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+
+        auto sbRes = reinterpret_cast<GET_PASS_ITEM_RESPONSE*>(recvBuffer);
         
+        if (!sbRes->isSuccess) std::cout << "획득 실패" << '\n';
+
+        PassItemForSend tempP = sbRes->passItemForSend;
+
+        switch (tempP.itemType) {
+            case 0: { // 장비
+                EQUIPMENT acqEq;
+                acqEq.itemCode = tempP.itemCode;
+                eq[sbRes->position] = acqEq;
+            }
+            break;
+            case 1: { // 소비
+                CONSUMABLES acqCs;
+                acqCs.itemCode = tempP.itemCode;
+                cs[sbRes->position] = acqCs;
+            }
+            break;
+            case 2: { // 재료
+                MATERIALS acqMt;
+                acqMt.itemCode = tempP.itemCode;
+                mt[sbRes->position] = acqMt;
+            }
+            break;
+        }
+
+        passDataMap[passId_][{passLevel_, passCurrenyType_}].getCheck = sbRes->isSuccess;
     }
 
 private:
@@ -1476,10 +1509,10 @@ private:
 
 
     // PASSINFO
-    std::unordered_map<std::string, std::vector<PASSDATA_CLIENT>> passInfoMap;
+    std::unordered_map<std::string, USERPASSINFO> passInfoMap;
+    std::unordered_map<std::string, std::unordered_map<PassDataKey, PassItem_Client, PassDataKeyHash>> passDataMap;
 
     // SHOPINFO
-    std::vector<ShopItemForSend> shopDataInfos;
     std::vector<ShopItemForSend> shopItems;
 
 

@@ -283,13 +283,30 @@ int main() {
             case 8: {
                 user.GetShopInfo();
                 std::cout << "구매 할 아이템 코드, 개수, 타입 입력" << '\n';
-                std::cout << "나가고 싶으면 0 입력" << '\n';
+                std::cout << "뒤로가기 : 0 입력" << '\n';
                 int a,b,c ;
                 std::cin >> a;
                 if (a == 0) break;
                 std::cin >> b >> c;
 
                 user.BuyItemFromShop(a, b, c);
+
+
+                //auto start = std::chrono::high_resolution_clock::now();
+
+                // user.TEST_BuyItemFromShop(); 클라이언트 3 / 타이머 세팅 7 + 500번
+
+                //auto end = std::chrono::high_resolution_clock::now();
+                //auto dur = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+                //double seconds = dur / 1000000;
+
+                //double tps = 500 / seconds; // ** 수행 할 횟수 잘 적자
+
+                //std::cout << "[TEST_BuyItemFromShop] tps : " << tps << " : " << seconds << "초" << std::endl;
+
+
+
+
 
                 break;
             }
@@ -306,18 +323,20 @@ int main() {
             case 10: {
                 user.GetPassInfo();
 
-                std::cout << "충전할 캐시 입력" << '\n';
                 std::cout << "획득할 패스의 이름과 레벨, 결제 유형 입력" << '\n';
-                std::cout << "나가고 싶으면 엔터 입력" << '\n';
+                std::cout << "뒤로가기 : 0 입력" << '\n';
 
                 std::string passId;
                 uint32_t passLevel, passCurrenyType;
                 std::cin >> passId;
-                if (passId == "") break;
+                if (passId == "0") break;
 
                 std::cin >> passLevel >> passCurrenyType;
 
                 user.GetPassItem(passId, passLevel, passCurrenyType);
+
+                // user.TEST_GetPassItem();
+
                 break;
             }
             case 11: {

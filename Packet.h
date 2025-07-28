@@ -22,6 +22,7 @@ const uint16_t MAX_USER_ID_LEN = 32;
 const uint16_t MAX_JWT_TOKEN_LEN = 256;
 const uint16_t MAX_SCORE_SIZE = 256;
 
+constexpr uint16_t MAX_EVENT_LEN = 32;
 constexpr uint16_t MAX_ITEM_ID_LEN = 32;
 constexpr uint16_t MAX_PASS_ID_LEN = 32;
 constexpr uint16_t MAX_PASS_SIZE = 512;
@@ -33,13 +34,13 @@ struct PACKET_HEADER
 	uint16_t PacketId;
 };
 
-struct PASSINFO_CLIENT {
+struct PassInfo_Client {
 	std::string eventStart;
 	std::string eventEnd;
 	uint16_t passMaxLevel = 0;
 };
 
-struct PASSDATAFORSEND {
+struct PassItemForSend {
 	char itemName[MAX_ITEM_ID_LEN + 1];
 	char passId[MAX_PASS_ID_LEN + 1];
 	uint16_t itemCode = 0;
@@ -50,7 +51,24 @@ struct PASSDATAFORSEND {
 	uint16_t passCurrencyType;
 };
 
-struct PASSDATA_CLIENT {
+struct PassDataKey {
+	uint16_t passLevel = 0;
+	uint16_t passCurrencyType = 0;
+
+	PassDataKey(uint16_t passLevel_, uint16_t passCurrencyType_) : passLevel(passLevel_), passCurrencyType(passCurrencyType_) {}
+
+	bool operator==(const PassDataKey& other) const {
+		return passLevel == other.passLevel && passCurrencyType == other.passCurrencyType;
+	}
+};
+
+struct PassDataKeyHash {
+	size_t operator()(const PassDataKey& k) const noexcept {
+		return std::hash<uint16_t>()(k.passLevel) ^ (std::hash<uint16_t>()(k.passCurrencyType) << 1);
+	}
+};
+
+struct PassItem_Client {
 	std::string itemName;
 	uint16_t itemCode = 0;
 	uint16_t passLevel = 0;
@@ -60,49 +78,48 @@ struct PASSDATA_CLIENT {
 	uint16_t passCurrencyType;
 	bool getCheck = 0; // 획득 여부 체크
 
-	void SetData(PASSDATAFORSEND& pdf) {
+	void SetData(PassItemForSend& pdf) {
 		itemName = (std::string)pdf.itemName;
 		itemCode = pdf.itemCode;
+		passLevel = pdf.passLevel;
 		itemCount = pdf.itemCount;
 		daysOrCount = pdf.daysOrCount;
 		itemType = pdf.itemType;
 		passCurrencyType = pdf.passCurrencyType;
 	}
 
-	void printPassData() {
-		std::cout << "패스 레벨 :  " << itemName << '\n';
-		std::cout << "아이템 이름 : " << itemName << '\n';
-		std::cout << "아이템 개수 : " << itemCount << '\n';
-		std::cout << "아이템  : " << daysOrCount << '\n';
+	void PrintPassData() {
+		std::cout << "패스 레벨 :  " << passLevel;
+		std::cout << " / 아이템 이름 : " << itemName;
 
 		switch (itemType) {
 		case 0: { // 장비
-			std::cout << "아이템 사용 기한 : " << daysOrCount << "일" << '\n';
+			std::cout << " / 기한 : " << daysOrCount << "일 ";
 		}
 			  break;
 		case 1: { // 소비
-			std::cout << "아이템 획득 개수 :  " << daysOrCount << "개" << '\n';
+			std::cout << " / 개수 :  " << daysOrCount << "개 ";
 		}
 			  break;
 		case 2: { // 재료
-			std::cout << "아이템 획득 개수 : " << daysOrCount << "개" << '\n';
+			std::cout << " / 개수 : " << daysOrCount << "개 ";
 		}
 			  break;
 		}
 
 		switch (passCurrencyType) {
 		case 0: {
-			std::cout << "결제 유형 : 무료 " << '\n';
+			std::cout << " / 무료 ";
 		}
 			  break;
 		case 1: {
-			std::cout << "결제 유형 : 유료1 " << '\n';
+			std::cout << " / 유료 ";
 		}
 			  break;
 		}
 
-		if(getCheck) std::cout << "획득한 아이템" << '\n';
-		else  std::cout << "미획득 아이템" << '\n';
+		if(getCheck) std::cout << " / 획득" << '\n';
+		else  std::cout << " / 미획득" << '\n';
 	}
 };
 
@@ -148,6 +165,20 @@ struct MATERIALS {
 	uint16_t itemCode = 0;
 	uint16_t position = 0;
 	uint16_t count = 0;
+};
+
+struct PASSINFO {
+	char passId[MAX_PASS_ID_LEN + 1];
+	char eventStart[MAX_EVENT_LEN + 1];
+	char eventEnd[MAX_EVENT_LEN + 1];
+	uint16_t passMaxLevel;
+};
+
+struct USERPASSINFO {
+	PASSINFO passInfo;
+	uint16_t passLevel;
+	uint16_t passExp;
+	uint16_t passCurrencyType;
 };
 
 struct PASSREWARDNFO {
@@ -264,10 +295,21 @@ struct SHOP_BUY_ITEM_REQUEST : PACKET_HEADER {
 
 struct SHOP_BUY_ITEM_RESPONSE : PACKET_HEADER {
 	uint32_t remainMoney;
-	uint16_t passCurrencyType;
+	uint16_t currencyType;
 	bool isSuccess;
 };
 
+struct GET_PASS_ITEM_REQUEST : PACKET_HEADER {
+	char passId[MAX_PASS_ID_LEN + 1];
+	uint16_t passLevel;
+	uint16_t passCurrencyType;
+};
+
+struct GET_PASS_ITEM_RESPONSE : PACKET_HEADER {
+	PassItemForSend passItemForSend;
+	uint16_t position;
+	bool isSuccess;
+};
 
 //  ---------------------------- LOGIN  ----------------------------
 
@@ -314,13 +356,20 @@ struct MATERIALS_RESPONSE : PACKET_HEADER {
 	char Materials[MAX_INVEN_SIZE + 1];
 };
 
+struct PASSINFO_REQUEST : PACKET_HEADER {
+
+};
+
+struct PASSINFO_RESPONSE : PACKET_HEADER {
+	uint16_t passCount = 0;
+};
+
 struct PASSREWARDINFO_REQUEST : PACKET_HEADER {
 
 };
 
 struct PASSREWARDINFO_RESPONSE : PACKET_HEADER {
-	uint16_t passCount = 0;
-	char PassRewords[MAX_PASS_SIZE + 1];
+	uint16_t passRewordCount = 0;
 };
 
 
@@ -567,6 +616,8 @@ enum class PACKET_ID : uint16_t {
 	MATERIALS_RESPONSE = 822,
 	PASSREWARDINFO_REQUEST = 823,
 	PASSREWARDINFO_RESPONSE = 824,
+	PASSINFO_REQUEST = 825,
+	PASSINFO_RESPONSE = 826,
 
 	//  ---------------------------- CHANNEL (1501~)  ----------------------------
 
