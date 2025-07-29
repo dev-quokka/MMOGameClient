@@ -62,9 +62,11 @@ struct PassDataKey {
 	}
 };
 
-struct PassDataKeyHash {
-	size_t operator()(const PassDataKey& k) const noexcept {
-		return std::hash<uint16_t>()(k.passLevel) ^ (std::hash<uint16_t>()(k.passCurrencyType) << 1);
+struct PassDataKeySort {
+	bool operator()(const PassDataKey& a, const PassDataKey& b) const {
+		if (a.passLevel != b.passLevel) return a.passLevel < b.passLevel;  
+
+		return a.passCurrencyType < b.passCurrencyType; 
 	}
 };
 
@@ -294,9 +296,11 @@ struct SHOP_BUY_ITEM_REQUEST : PACKET_HEADER {
 };
 
 struct SHOP_BUY_ITEM_RESPONSE : PACKET_HEADER {
+	ShopItemForSend shopItemForSend;
 	uint32_t remainMoney;
 	uint16_t currencyType;
-	bool isSuccess;
+	uint16_t position;
+	bool isSuccess = false;
 };
 
 struct GET_PASS_ITEM_REQUEST : PACKET_HEADER {
@@ -307,8 +311,24 @@ struct GET_PASS_ITEM_REQUEST : PACKET_HEADER {
 
 struct GET_PASS_ITEM_RESPONSE : PACKET_HEADER {
 	PassItemForSend passItemForSend;
-	uint16_t position;
-	bool isSuccess;
+	char passId[MAX_PASS_ID_LEN + 1];
+	uint16_t passLevel;
+	uint16_t passCurrencyType;
+	uint16_t position = 0;
+	bool passAcq = false;
+	bool isSuccess = false;
+};
+
+struct PASS_EXP_UP_REQUEST : PACKET_HEADER {
+	char passId[MAX_PASS_ID_LEN + 1];
+	uint16_t missionNum; // 수행할 미션 번호
+};
+
+struct PASS_EXP_UP_RESPONSE : PACKET_HEADER {
+	char passId[MAX_PASS_ID_LEN + 1];
+	uint16_t passLevel = 0;
+	uint16_t passExp;
+	bool isSuccess = false;
 };
 
 //  ---------------------------- LOGIN  ----------------------------

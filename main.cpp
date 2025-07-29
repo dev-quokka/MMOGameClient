@@ -78,19 +78,20 @@ int main() {
             std::cout << std::endl;
             uint16_t select;
 
-            std::cout << "========================" << std::endl;
-            std::cout << "===   1. 내 정보     ===" << std::endl;
-            std::cout << "===2. 몹잡기(경험치) ===" << std::endl;
-            std::cout << "===   3. 인벤토리    ===" << std::endl;
-            std::cout << "===   4. 레이드 매칭 ===" << std::endl;
-            std::cout << "===   5. 레이드 랭킹 ===" << std::endl;
-            std::cout << "===   6. 서버 이동   ===" << std::endl;
-            std::cout << "===   7. 채널 이동   ===" << std::endl;
-            std::cout << "===   8. 상점 이동   ===" << std::endl;
-            std::cout << "===   9. 캐시 충전   ===" << std::endl;
-            std::cout << "===   10. 패스정보   ===" << std::endl;
-            std::cout << "===   11. 로그아웃   ===" << std::endl;
-            std::cout << "========================" << std::endl;
+            std::cout << "==============================" << std::endl;
+            std::cout << "===      1. 내 정보        ===" << std::endl;
+            std::cout << "===   2. 몹잡기(경험치)    ===" << std::endl;
+            std::cout << "===      3. 인벤토리       ===" << std::endl;
+            std::cout << "===      4. 레이드 매칭    ===" << std::endl;
+            std::cout << "===      5. 레이드 랭킹    ===" << std::endl;
+            std::cout << "===      6. 서버 이동      ===" << std::endl;
+            std::cout << "===      7. 채널 이동      ===" << std::endl;
+            std::cout << "===      8. 상점 이동      ===" << std::endl;
+            std::cout << "===      9. 캐시 충전      ===" << std::endl;
+            std::cout << "===     10. 패스 정보      ===" << std::endl;
+            std::cout << "===11. 패스미션(패스레벨업)===" << std::endl;
+            std::cout << "===     12. 로그아웃       ===" << std::endl;
+            std::cout << "==============================" << std::endl;
 
             std::cin >> select;
 
@@ -132,6 +133,7 @@ int main() {
 
                     if (checknum >= 4) break;
                     user.GetInventory(checknum);
+                    std::cout << '\n';
                     std::cout << "1. 슬롯 이동 " << "2. 강화(장비만)" << "3. 획득" << "4. 삭제" << "5. 뒤로가기" << std::endl;
                     int checknum2;
                     std::cin >> checknum2;
@@ -282,7 +284,7 @@ int main() {
             }
             case 8: {
                 user.GetShopInfo();
-                std::cout << "구매 할 아이템 코드, 개수, 타입 입력" << '\n';
+                std::cout << "구매 할 아이템 코드, 사용 기한 or 개수, 타입 입력 (장비:0,소비:1,재료:2)" << '\n';
                 std::cout << "뒤로가기 : 0 입력" << '\n';
                 int a,b,c ;
                 std::cin >> a;
@@ -290,29 +292,11 @@ int main() {
                 std::cin >> b >> c;
 
                 user.BuyItemFromShop(a, b, c);
-
-
-                //auto start = std::chrono::high_resolution_clock::now();
-
-                // user.TEST_BuyItemFromShop(); 클라이언트 3 / 타이머 세팅 7 + 500번
-
-                //auto end = std::chrono::high_resolution_clock::now();
-                //auto dur = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-                //double seconds = dur / 1000000;
-
-                //double tps = 500 / seconds; // ** 수행 할 횟수 잘 적자
-
-                //std::cout << "[TEST_BuyItemFromShop] tps : " << tps << " : " << seconds << "초" << std::endl;
-
-
-
-
-
                 break;
             }
             case 9: {
                 std::cout << "충전할 캐시 입력" << '\n';
-                std::cout << "나가고 싶으면 0 입력" << '\n';
+                std::cout << "뒤로가기 : 0 입력" << '\n';
                 uint32_t a;
                 std::cin >> a;
                 if (a == 0) break;
@@ -321,9 +305,9 @@ int main() {
                 break;
             }
             case 10: {
-                user.GetPassInfo();
+                user.GetPassData();
 
-                std::cout << "획득할 패스의 이름과 레벨, 결제 유형 입력" << '\n';
+                std::cout << "획득할 패스 ID, 레벨, 결제 유형 입력 (무료:0, 유료: 1)" << '\n';
                 std::cout << "뒤로가기 : 0 입력" << '\n';
 
                 std::string passId;
@@ -335,11 +319,38 @@ int main() {
 
                 user.GetPassItem(passId, passLevel, passCurrenyType);
 
-                // user.TEST_GetPassItem();
+                //auto start = std::chrono::high_resolution_clock::now();
+
+                // user.TEST_GetPassItem(); 클라이언트 1 / 타이머 세팅 20 + 500번
+
+                //auto end = std::chrono::high_resolution_clock::now();
+                //auto dur = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+                //double seconds = dur / 1000000;
+
+                //double tps = 1000 / seconds; // ** 수행 할 횟수 잘 적자
+
+                //std::cout << "[TEST_GetPassItem] tps : " << tps << " : " << seconds << "초" << '\n';
 
                 break;
             }
             case 11: {
+                user.GetPassInfo();
+
+                std::cout << "미션 1 : 경험치 1 증가" << '\n';
+                std::cout << "미션 2 : 경험치 2 증가" << '\n';
+                std::cout << "미션 3 : 경험치 3 증가" << '\n';
+                std::cout << "미션 4 : 경험치 4 증가" << '\n';
+                std::cout << "미션 5 : 경험치 5 증가" << '\n';
+                std::cout << "수행할 미션 번호와 패스 ID 누르기 (뒤로가기 : 0입력)" << '\n';
+
+                int k = 0; std::string passId;
+                std::cin >> k;
+                if (k == 0 || k > 5) break;
+                std::cin >> passId;
+                user.GetPassExp(passId, k);
+                break;
+            }
+            case 12: {
                 inChannelCheck = false;
                 onlineCheck = false;
                 std::this_thread::sleep_for(std::chrono::seconds(1));

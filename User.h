@@ -7,6 +7,7 @@
 #include <vector>
 #include <atomic>
 #include <iostream>
+#include <map>
 #include <unordered_map>
 #include <iomanip>
 
@@ -44,6 +45,7 @@ public:
 
         userCash = mtPacket->chargedCash;
         std::cout << "충전 성공 ! 캐시 금액 : " << mtPacket->chargedCash << '\n';
+        std::this_thread::sleep_for(std::chrono::seconds(1)); // 충전 후 재충전 제한 시간 1초 설정
     }
 
     bool init() {
@@ -70,8 +72,6 @@ public:
         }
 
         std::cout << "Login Server Connect Success" << std::endl;
-
-        memset(recvBuffer, 0, PACKET_SIZE);
 
 
         // ============================ 유저 데이터 요청 ============================
@@ -367,8 +367,8 @@ public:
 
         for (int i = 0; i < passDataCount; i++) {
             std::string passId = (std::string)dataArray[i].passId;
-
             PassItem_Client pc;
+
             pc.SetData(dataArray[i]);
 
             auto it = passRewardInfoMap.find(passId);
@@ -379,7 +379,7 @@ public:
                     uint16_t level = dataArray[i].passLevel;
 
                     if (level < 64) {
-                        pc.getCheck = (rewardInfo.passReqwardBits >> level) != 0; // 코드 잘 들어가는지 체크
+                        pc.getCheck = (rewardInfo.passReqwardBits >> (level-1)) != 0; // 코드 잘 들어가는지 체크. (*비트 사용할때 -1 합시다)
                     }
                     else { // 잘못된 데이터
                         return false;
@@ -391,7 +391,7 @@ public:
         }
 
         std::cout << "패스 데이터 수신 성공" << '\n';
-        std::cout << userId << " 게임 접속 성공 !" << std::endl;
+        std::cout << userId << " 게임 접속 성공 !" << '\n';
     }
 
     uint16_t MoveServer(bool countCheck_) {
@@ -1399,30 +1399,58 @@ public:
         recv(userSkt, recvBuffer, PACKET_SIZE, 0);
 
         auto sbRes = reinterpret_cast<SHOP_BUY_ITEM_RESPONSE*>(recvBuffer);
-        std::cout << sbRes->remainMoney << std::endl;
-
+        std::cout << sbRes->position << std::endl;
         if (sbRes->isSuccess) {
+            switch (sbRes->shopItemForSend.itemType) {
+            case 0: { // 장비
+                EQUIPMENT acqEq;
+                acqEq.itemCode = sbRes->shopItemForSend.itemCode;
+                eq[sbRes->position] = acqEq;
+                break;
+            }
+            case 1: { // 소비
+                CONSUMABLES acqCs;
+                acqCs.itemCode = sbRes->shopItemForSend.itemCode;
+                cs[sbRes->position] = acqCs;
+                break;
+            }
+            case 2: { // 재료
+                MATERIALS acqMt;
+                acqMt.itemCode = sbRes->shopItemForSend.itemCode;
+                mt[sbRes->position] = acqMt;
+                break;
+            }
+            }
+
             switch (sbRes->currencyType) {
             case 0: { // 골드
                 userGold = sbRes->remainMoney;
+                std::cout << "구매 성공 !" << '\n';
+                std::cout << "남은 골드 : " << sbRes->remainMoney << '\n';
                 break;
             }
             case 1: { // 캐쉬
                 userCash = sbRes->remainMoney;
+                std::cout << "구매 성공 !" << '\n';
+                std::cout << "남은 캐쉬 : " << sbRes->remainMoney << '\n';
                 break;
             }
             case 2: { // 마일리지
                 userMileage = sbRes->remainMoney;
+                std::cout << "구매 성공 !" << '\n';
+                std::cout << "남은 마일리지 : " << sbRes->remainMoney << '\n';
                 break;
             }
             }
-            std::cout << "구매 성공" << '\n';
-            std::this_thread::sleep_for(std::chrono::milliseconds(500)); // 구매 후 재 구매 제한 시간 설정
+            std::this_thread::sleep_for(std::chrono::milliseconds(500)); // 구매 요청 후 재 구매 제한 시간 설정
         }
-        else std::cout << "구매 실패" << '\n';
+        else {
+            std::cout << "구매 실패. 금액 부족 !" << '\n';
+            std::this_thread::sleep_for(std::chrono::milliseconds(500)); // 구매 요청 후 재 구매 제한 시간 설정
+        }
     }
 
-    void GetPassInfo() {
+    void GetPassData() {
         for (auto& m : passInfoMap) {
             std::cout << "패스 ID : " << m.first << "/ 레벨 : " << m.second.passLevel << "/ 경험치 : " << m.second.passExp << '\n';
             std::cout << "이벤트 기간 : " << m.second.passInfo.eventStart << " ~ " << m.second.passInfo.eventEnd << '\n';
@@ -1432,6 +1460,14 @@ public:
             }
             std::cout << '\n';
         }
+    }
+
+    void GetPassInfo() {
+        for (auto& m : passInfoMap) {
+            std::cout << "패스 ID : " << m.first << "/ 레벨 : " << m.second.passLevel << "/ 경험치 : " << m.second.passExp << '\n';
+            std::cout << "이벤트 기간 : " << m.second.passInfo.eventStart << " ~ " << m.second.passInfo.eventEnd << '\n';
+        }
+        std::cout << '\n';
     }
 
     void GetPassItem(std::string passId_, uint16_t passLevel_, uint16_t passCurrenyType_) {
@@ -1448,7 +1484,11 @@ public:
 
         auto sbRes = reinterpret_cast<GET_PASS_ITEM_RESPONSE*>(recvBuffer);
         
-        if (!sbRes->isSuccess) std::cout << "획득 실패" << '\n';
+        if (!sbRes->isSuccess) {
+            std::cout << "획득 실패. 패스 레벨 미달" << '\n';
+            std::this_thread::sleep_for(std::chrono::milliseconds(500)); // 패스 획득 요청 후 획득 제한 시간 설정
+            return;
+        }
 
         PassItemForSend tempP = sbRes->passItemForSend;
 
@@ -1473,7 +1513,37 @@ public:
             break;
         }
 
-        passDataMap[passId_][{passLevel_, passCurrenyType_}].getCheck = sbRes->isSuccess;
+        std::cout << "획득 성공" << '\n';
+
+        // 클라이언트에서 처리하는 것이 아닌 모든 데이터 서버에서 전달한 데이터로만 사용하도록 변경
+        passDataMap[sbRes->passId][{sbRes->passLevel, sbRes->passCurrencyType}].getCheck = sbRes->passAcq;
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(500)); // 패스 획득 요청 후 획득 제한 시간 설정
+    }
+
+    void GetPassExp(std::string& passId_, uint16_t missionNum_){
+
+        PASS_EXP_UP_REQUEST peuReq;
+        peuReq.PacketId = (UINT16)PACKET_ID::PASS_EXP_UP_REQUEST;
+        peuReq.PacketLength = sizeof(PASS_EXP_UP_REQUEST);
+        strncpy_s(peuReq.passId, passId_.c_str(), MAX_PASS_ID_LEN + 1);
+        peuReq.missionNum = missionNum_;
+
+        send(userSkt, (char*)&peuReq, sizeof(peuReq), 0);
+        recv(userSkt, recvBuffer, PACKET_SIZE, 0);
+
+        auto sbRes = reinterpret_cast<PASS_EXP_UP_RESPONSE*>(recvBuffer);
+
+        if (!sbRes->isSuccess) {
+            std::cout << "수행한 미션인지 확인해주세요 !" << '\n';
+            return;
+        }
+
+        std::cout << "패스 ID : " << sbRes->passId
+            << " 경험치 증가 성공. 현재 패스 레벨 : " << sbRes->passLevel << ", 패스 경험치 : " << sbRes->passExp << '\n';
+
+        passInfoMap[sbRes->passId].passLevel = sbRes->passLevel;
+        passInfoMap[sbRes->passId].passExp = sbRes->passExp;
     }
 
 private:
@@ -1510,7 +1580,7 @@ private:
 
     // PASSINFO
     std::unordered_map<std::string, USERPASSINFO> passInfoMap;
-    std::unordered_map<std::string, std::unordered_map<PassDataKey, PassItem_Client, PassDataKeyHash>> passDataMap;
+    std::unordered_map<std::string, std::map<PassDataKey, PassItem_Client, PassDataKeySort>> passDataMap;
 
     // SHOPINFO
     std::vector<ShopItemForSend> shopItems;
